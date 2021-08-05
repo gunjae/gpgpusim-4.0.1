@@ -78,6 +78,7 @@ class gpgpu_sim_wrapper {};
 #include <sstream>
 #include <string>
 
+#define PRF_LD_CNT 1
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 bool g_interactive_debugger_enabled = false;
@@ -965,18 +966,41 @@ void gpgpu_sim::reinit_clock_domains(void) {
 }
 
 bool gpgpu_sim::active() {
-  if (m_config.gpu_max_cycle_opt &&
-      (gpu_tot_sim_cycle + gpu_sim_cycle) >= m_config.gpu_max_cycle_opt)
+  if (m_config.gpu_max_cycle_opt && 
+		  (gpu_tot_sim_cycle + gpu_sim_cycle) >= m_config.gpu_max_cycle_opt){
+  	#if (PRF_LD_CNT)
+		for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
+			m_cluster[i]->force_update_ld_cnt();
+	#endif
+  
     return false;
+  }
   if (m_config.gpu_max_insn_opt &&
-      (gpu_tot_sim_insn + gpu_sim_insn) >= m_config.gpu_max_insn_opt)
+      (gpu_tot_sim_insn + gpu_sim_insn) >= m_config.gpu_max_insn_opt){
+  	#if (PRF_LD_CNT)
+		for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
+			m_cluster[i]->force_update_ld_cnt();
+	#endif
     return false;
+  }
   if (m_config.gpu_max_cta_opt &&
-      (gpu_tot_issued_cta >= m_config.gpu_max_cta_opt))
+      (gpu_tot_issued_cta >= m_config.gpu_max_cta_opt)){
+  	#if (PRF_LD_CNT)
+		for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
+			m_cluster[i]->force_update_ld_cnt();
+	#endif	
+  
     return false;
+  }
   if (m_config.gpu_max_completed_cta_opt &&
-      (gpu_completed_cta >= m_config.gpu_max_completed_cta_opt))
+      (gpu_completed_cta >= m_config.gpu_max_completed_cta_opt)){
+
+	#if (PRF_LD_CNT)
+		for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
+			m_cluster[i]->force_update_ld_cnt();
+	#endif
     return false;
+  }
   if (m_config.gpu_deadlock_detect && gpu_deadlock) return false;
   for (unsigned i = 0; i < m_shader_config->n_simt_clusters; i++)
     if (m_cluster[i]->get_not_completed() > 0) return true;
@@ -1626,6 +1650,9 @@ void shader_core_ctx::issue_block2core(kernel_info_t &kernel) {
   // contexts
   reinit(start_thread, end_thread, false);
 
+  // JH : log current CTA id in m_warps[]
+  dim3 curr_cta = kernel.get_next_cta_id();
+  
   // initalize scalar threads and determine which hardware warps they are
   // allocated to bind functional simulation state of threads to hardware
   // resources (simulation)
@@ -1676,7 +1703,8 @@ void shader_core_ctx::issue_block2core(kernel_info_t &kernel) {
   m_barriers.allocate_barrier(free_cta_hw_id, warps);
 
   // initialize the SIMT stacks and fetch hardware
-  init_warps(free_cta_hw_id, start_thread, end_thread, ctaid, cta_size, kernel);
+  //init_warps(free_cta_hw_id, start_thread, end_thread, ctaid, cta_size, kernel);
+  init_warps(free_cta_hw_id, start_thread, end_thread, ctaid, cta_size, kernel, curr_cta, kernel.get_grid_dim()); // JH
   m_n_active_cta++;
 
   shader_CTA_count_log(m_sid, 1);

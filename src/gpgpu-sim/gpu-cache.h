@@ -922,6 +922,9 @@ class mshr_table {
            "Change of MSHR parameters between kernels is not allowed");
   }
 
+  // JH : returns number of entries in MSHR
+  unsigned num_entries() const { return m_data.size(); }
+
  private:
   // finite sized, fully associative table, with a finite maximum number of
   // merged requests
@@ -1216,6 +1219,10 @@ class baseline_cache : public cache_t {
                         mem_access_sector_mask_t mask) {
     m_tag_array->fill(addr, time, mask);
   }
+  // JH : returnning number of entries (in-flight) in MSHR
+  unsigned num_entries_mshr() const { return m_mshrs.num_entries(); }
+  unsigned num_entries_misq() const { return m_miss_queue.size(); }
+
 
  protected:
   // Constructor that can be used by derived classes with custom tag arrays

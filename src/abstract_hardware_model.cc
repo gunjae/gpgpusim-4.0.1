@@ -59,6 +59,20 @@ void warp_inst_t::issue(const active_mask_t &mask, unsigned warp_id,
   m_cache_hit = false;
   m_empty = false;
   m_scheduler_id = sch_id;
+
+  // JH
+  f_touch_cache = false;
+  f_undet = false;
+  // JH: initialize cycle log pointers
+  m_cache_cycle_ptr = 0;
+  m_sm_icnt_cycle_ptr = 0;
+  m_icnt_sm_cycle_ptr = 0;
+  m_resp_cycle_ptr = 0;
+  for (unsigned r=0; r < 4; r++) {
+	  m_l1cache_status[r] = 0;
+	  m_l2cache_status[r] = 0;
+  }
+  // -------------------
 }
 
 checkpoint::checkpoint() {

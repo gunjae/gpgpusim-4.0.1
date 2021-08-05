@@ -51,6 +51,7 @@
 #define PRIORITIZE_MSHR_OVER_WB 1
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define PRF_LD_CNT 1
 
 mem_fetch *shader_core_mem_fetch_allocator::alloc(
     new_addr_type addr, mem_access_type type, unsigned size, bool wr,
@@ -496,7 +497,9 @@ void shader_core_ctx::reinit(unsigned start_thread, unsigned end_thread,
 
 void shader_core_ctx::init_warps(unsigned cta_id, unsigned start_thread,
                                  unsigned end_thread, unsigned ctaid,
-                                 int cta_size, kernel_info_t &kernel) {
+                                 int cta_size, kernel_info_t &kernel,
+				 dim3 cta_id_3d, //JH
+				 dim3 grid_dim) {//JH
   //
   address_type start_pc = next_pc(start_thread);
   unsigned kernel_id = kernel.get_uid();
@@ -519,6 +522,8 @@ void shader_core_ctx::init_warps(unsigned cta_id, unsigned start_thread,
       }
       m_simt_stack[i]->launch(start_pc, active_threads);
 
+
+
       if (m_gpu->resume_option == 1 && kernel_id == m_gpu->resume_kernel &&
           ctaid >= m_gpu->resume_CTA && ctaid < m_gpu->checkpoint_CTA_t) {
         char fname[2048];
@@ -536,7 +541,10 @@ void shader_core_ctx::init_warps(unsigned cta_id, unsigned start_thread,
         start_pc = pc;
       }
 
-      m_warp[i]->init(start_pc, cta_id, i, active_threads, m_dynamic_warp_id);
+      //m_warp[i]->init(start_pc, cta_id, i, active_threads, m_dynamic_warp_id);
+      m_warp[i]->init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id, cta_id_3d, grid_dim);
+	// JH : scoreboard initialization (for det/undet)
+
       ++m_dynamic_warp_id;
       m_not_completed += n_active;
       ++m_active_warps;
@@ -612,25 +620,26 @@ void shader_core_stats::print(FILE *fout) const {
   fprintf(fout, "gpgpu_n_intrawarp_mshr_merge = %d\n",
           gpgpu_n_intrawarp_mshr_merge);
   fprintf(fout, "gpgpu_n_cmem_portconflict = %d\n", gpgpu_n_cmem_portconflict);
-
+// JH 
   fprintf(fout, "gpgpu_stall_shd_mem[c_mem][resource_stall] = %d\n",
           gpu_stall_shd_mem_breakdown[C_MEM][BK_CONF]);
-  // fprintf(fout, "gpgpu_stall_shd_mem[c_mem][mshr_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[C_MEM][MSHR_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[c_mem][icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[C_MEM][ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[c_mem][data_port_stall] = %d\n",
-  // gpu_stall_shd_mem_breakdown[C_MEM][DATA_PORT_STALL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[t_mem][mshr_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[T_MEM][MSHR_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[t_mem][icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[T_MEM][ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[t_mem][data_port_stall] = %d\n",
-  // gpu_stall_shd_mem_breakdown[T_MEM][DATA_PORT_STALL]);
+  fprintf(fout, "gpgpu_stall_shd_mem[c_mem][mshr_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[C_MEM][MSHR_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[c_mem][icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[C_MEM][ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[c_mem][data_port_stall] = %d\n",
+  gpu_stall_shd_mem_breakdown[C_MEM][DATA_PORT_STALL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[t_mem][mshr_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[T_MEM][MSHR_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[t_mem][icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[T_MEM][ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[t_mem][data_port_stall] = %d\n",
+  gpu_stall_shd_mem_breakdown[T_MEM][DATA_PORT_STALL]);
+// JH
+
   fprintf(fout, "gpgpu_stall_shd_mem[s_mem][bk_conf] = %d\n",
           gpu_stall_shd_mem_breakdown[S_MEM][BK_CONF]);
-  fprintf(
-      fout, "gpgpu_stall_shd_mem[gl_mem][resource_stall] = %d\n",
+  fprintf(fout, "gpgpu_stall_shd_mem[gl_mem][resource_stall] = %d\n",
       gpu_stall_shd_mem_breakdown[G_MEM_LD][BK_CONF] +
           gpu_stall_shd_mem_breakdown[G_MEM_ST][BK_CONF] +
           gpu_stall_shd_mem_breakdown[L_MEM_LD][BK_CONF] +
@@ -651,38 +660,40 @@ void shader_core_stats::print(FILE *fout) const {
               gpu_stall_shd_mem_breakdown[L_MEM_ST]
                                          [DATA_PORT_STALL]);  // data port stall
                                                               // at data cache
-  // fprintf(fout, "gpgpu_stall_shd_mem[g_mem_ld][mshr_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[G_MEM_LD][MSHR_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[g_mem_ld][icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[G_MEM_LD][ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[g_mem_ld][wb_icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[G_MEM_LD][WB_ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[g_mem_ld][wb_rsrv_fail] = %d\n",
-  // gpu_stall_shd_mem_breakdown[G_MEM_LD][WB_CACHE_RSRV_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[g_mem_st][mshr_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[G_MEM_ST][MSHR_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[g_mem_st][icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[G_MEM_ST][ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[g_mem_st][wb_icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[G_MEM_ST][WB_ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[g_mem_st][wb_rsrv_fail] = %d\n",
-  // gpu_stall_shd_mem_breakdown[G_MEM_ST][WB_CACHE_RSRV_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[l_mem_ld][mshr_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[L_MEM_LD][MSHR_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[l_mem_ld][icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[L_MEM_LD][ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[l_mem_ld][wb_icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[L_MEM_LD][WB_ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[l_mem_ld][wb_rsrv_fail] = %d\n",
-  // gpu_stall_shd_mem_breakdown[L_MEM_LD][WB_CACHE_RSRV_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[l_mem_st][mshr_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[L_MEM_ST][MSHR_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[l_mem_st][icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[L_MEM_ST][ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[l_mem_ld][wb_icnt_rc] = %d\n",
-  // gpu_stall_shd_mem_breakdown[L_MEM_ST][WB_ICNT_RC_FAIL]); fprintf(fout,
-  // "gpgpu_stall_shd_mem[l_mem_ld][wb_rsrv_fail] = %d\n",
-  // gpu_stall_shd_mem_breakdown[L_MEM_ST][WB_CACHE_RSRV_FAIL]);
+ // JH
+  fprintf(fout, "gpgpu_stall_shd_mem[g_mem_ld][mshr_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[G_MEM_LD][MSHR_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[g_mem_ld][icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[G_MEM_LD][ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[g_mem_ld][wb_icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[G_MEM_LD][WB_ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[g_mem_ld][wb_rsrv_fail] = %d\n",
+  gpu_stall_shd_mem_breakdown[G_MEM_LD][WB_CACHE_RSRV_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[g_mem_st][mshr_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[G_MEM_ST][MSHR_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[g_mem_st][icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[G_MEM_ST][ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[g_mem_st][wb_icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[G_MEM_ST][WB_ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[g_mem_st][wb_rsrv_fail] = %d\n",
+  gpu_stall_shd_mem_breakdown[G_MEM_ST][WB_CACHE_RSRV_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[l_mem_ld][mshr_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[L_MEM_LD][MSHR_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[l_mem_ld][icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[L_MEM_LD][ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[l_mem_ld][wb_icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[L_MEM_LD][WB_ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[l_mem_ld][wb_rsrv_fail] = %d\n",
+  gpu_stall_shd_mem_breakdown[L_MEM_LD][WB_CACHE_RSRV_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[l_mem_st][mshr_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[L_MEM_ST][MSHR_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[l_mem_st][icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[L_MEM_ST][ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[l_mem_ld][wb_icnt_rc] = %d\n",
+  gpu_stall_shd_mem_breakdown[L_MEM_ST][WB_ICNT_RC_FAIL]); fprintf(fout,
+  "gpgpu_stall_shd_mem[l_mem_ld][wb_rsrv_fail] = %d\n",
+  gpu_stall_shd_mem_breakdown[L_MEM_ST][WB_CACHE_RSRV_FAIL]);
+// JH
 
   fprintf(fout, "gpu_reg_bank_conflict_stalls = %d\n",
           gpu_reg_bank_conflict_stalls);
@@ -705,6 +716,36 @@ void shader_core_stats::print(FILE *fout) const {
 
   m_outgoing_traffic_stats->print(fout);
   m_incoming_traffic_stats->print(fout);
+
+#if(PRF_LD_CNT) // JH
+   fprintf(fout, "GK: ----- number of repeated load in a warp ---------------------\n");
+   std::map<address_type/*PC*/, unsigned/*# of ld*/>::const_iterator it_c;
+   address_type pc;
+   unsigned n_ld, n_warp;
+   unsigned n_undet, n_det;
+   for ( it_c=m_ld_cnt.begin(); it_c!=m_ld_cnt.end(); ++it_c ) {
+	   pc = it_c->first;
+	   n_ld = it_c->second;
+	   n_warp = m_ld_warp_cnt.find(pc)->second;
+	   n_undet = m_ld_undet_cnt.find(pc)->second;
+	   n_det = m_ld_det_cnt.find(pc)->second;
+	   fprintf(fout, "GK: pc=0x%08x, %3.3f (%3d / %3d) (u:%3d, d:%3d)\n", pc, (float)n_ld / n_warp, n_ld, n_warp, n_undet, n_det );
+   }
+   fprintf(fout, "GK: -------------------------------------------------------------\n");
+   
+   fprintf(fout, "GK_Summary: ----- number of repeated load in a warp ---------------------\n");
+   fprintf(fout, "GK_Summary: pc, n_ld/n_warp, n_ld, n_warp, n_undet, n_det\n");
+   for ( it_c=m_ld_cnt.begin(); it_c!=m_ld_cnt.end(); ++it_c ) {
+	   pc = it_c->first;
+	   n_ld = it_c->second;
+	   n_warp = m_ld_warp_cnt.find(pc)->second;
+	   n_undet = m_ld_undet_cnt.find(pc)->second;
+	   n_det = m_ld_det_cnt.find(pc)->second;
+	   fprintf(fout, "GK_Summary, 0x%08x, %3.3f, %3d, %3d, %3d, %3d\n", pc, (float)n_ld / n_warp, n_ld, n_warp, n_undet, n_det );
+   }
+   fprintf(fout, "GK_Summary: -------------------------------------------------------------\n");
+#endif	// PRF_LD_CNT
+
 }
 
 void shader_core_stats::event_warp_issued(unsigned s_id, unsigned warp_id,
@@ -926,7 +967,12 @@ void shader_core_ctx::fetch() {
               did_exit = true;
             }
           }
-          if (did_exit) m_warp[warp_id]->set_done_exit();
+          if (did_exit) {
+		  m_warp[warp_id]->set_done_exit();
+		  #if(PRF_LD_CNT) // JH
+			update_ld_cnt( warp_id );
+		  #endif	// PRF_LD_CNT
+	  }
           --m_active_warps;
           assert(m_active_warps >= 0);
         }
@@ -981,7 +1027,59 @@ void shader_core_ctx::fetch() {
   }
 
   m_L1I->cycle();
+  
+  // JH
+//  if( m_L1I->access_ready() ) {
+//	mem_fetch *mf = m_L1I->next_access();
+//      m_warp[mf->get_wid()].clear_imiss_pending();
+//        delete mf;
+//    }
 }
+
+#if(PRF_LD_CNT)  // JH
+void shader_core_ctx::update_ld_cnt( unsigned wid )
+{
+	std::map<address_type/*PC*/, unsigned/*count*/>::const_iterator it_warp;
+	
+	for ( it_warp=m_warp[wid]->m_ld_cnt.begin(); it_warp!=m_warp[wid]->m_ld_cnt.end(); ++it_warp ) {
+		address_type pc = it_warp->first;
+		unsigned cnt = it_warp->second;
+		if ( m_stats->m_ld_cnt.find(pc)==m_stats->m_ld_cnt.end() ) {
+			// not found
+			m_stats->m_ld_cnt[pc] = cnt;
+			m_stats->m_ld_warp_cnt[pc] = 1;
+
+			if ( m_warp[wid]->m_ld_undet_cnt.find(pc)==m_warp[wid]->m_ld_undet_cnt.end() )
+				m_stats->m_ld_undet_cnt[pc] = 0;
+			else
+				m_stats->m_ld_undet_cnt[pc] = m_warp[wid]->m_ld_undet_cnt.find(pc)->second;
+
+			if ( m_warp[wid]->m_ld_det_cnt.find(pc)==m_warp[wid]->m_ld_det_cnt.end() )
+				m_stats->m_ld_det_cnt[pc] = 0;
+			else
+				m_stats->m_ld_det_cnt[pc] = m_warp[wid]->m_ld_det_cnt.find(pc)->second;
+		} else {
+			// found in global stats
+			m_stats->m_ld_cnt[pc] += cnt;
+			m_stats->m_ld_warp_cnt[pc]++;
+			
+			if ( m_warp[wid]->m_ld_undet_cnt.find(pc)!=m_warp[wid]->m_ld_undet_cnt.end() )
+				m_stats->m_ld_undet_cnt[pc] += m_warp[wid]->m_ld_undet_cnt.find(pc)->second;
+
+			if ( m_warp[wid]->m_ld_det_cnt.find(pc)!=m_warp[wid]->m_ld_det_cnt.end() )
+				m_stats->m_ld_det_cnt[pc] += m_warp[wid]->m_ld_det_cnt.find(pc)->second;
+		}
+	}
+}
+
+void shader_core_ctx::force_update_ld_cnt()
+{
+	for (unsigned i=0; i < m_config->max_warps_per_shader; i++) {
+		if ( !m_warp[i]->done_exit() )
+			update_ld_cnt(i);
+	}
+}
+#endif	// PRF_LD_CNT
 
 void exec_shader_core_ctx::func_exec_inst(warp_inst_t &inst) {
   execute_warp_inst_t(inst);
@@ -991,12 +1089,49 @@ void exec_shader_core_ctx::func_exec_inst(warp_inst_t &inst) {
   }
 }
 
+#if(PRF_LD_CNT) // JH
+void shd_warp_t::add_ld_cnt( const warp_inst_t* inst ) 
+{
+	address_type pc = inst->pc;
+	
+	if ( m_ld_cnt.find(pc)==m_ld_cnt.end() ) {
+		// add new PC of a load instruction
+		m_ld_cnt[pc] = 1;
+	} else {
+		// load instruction appeared before
+		m_ld_cnt[pc]++;
+	}
+}
+
+void shd_warp_t::add_ld_undet_cnt( const warp_inst_t* inst )
+{
+	address_type pc = inst->pc;
+
+	if ( m_ld_undet_cnt.find(pc)==m_ld_undet_cnt.end() ) {
+		m_ld_undet_cnt[pc] = 1;
+	} else {
+		m_ld_undet_cnt[pc]++;
+	}
+}
+
+void shd_warp_t::add_ld_det_cnt( const warp_inst_t* inst )
+{
+	address_type pc = inst->pc;
+
+	if ( m_ld_det_cnt.find(pc)==m_ld_det_cnt.end() ) {
+		m_ld_det_cnt[pc] = 1;
+	} else {
+		m_ld_det_cnt[pc]++;
+	}
+}
+#endif	// PRF_LD_CNT
+
+
 void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
                                  const warp_inst_t *next_inst,
                                  const active_mask_t &active_mask,
                                  unsigned warp_id, unsigned sch_id) {
-  warp_inst_t **pipe_reg =
-      pipe_reg_set.get_free(m_config->sub_core_model, sch_id);
+  warp_inst_t **pipe_reg = pipe_reg_set.get_free(m_config->sub_core_model, sch_id);
   assert(pipe_reg);
 
   m_warp[warp_id]->ibuffer_free();
@@ -1008,6 +1143,14 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
                      sch_id);  // dynamic instruction information
   m_stats->shader_cycle_distro[2 + (*pipe_reg)->active_count()]++;
   func_exec_inst(**pipe_reg);
+	
+// JH : set number of memory requests
+  unsigned n_accesses = (*pipe_reg)->accessq_count();
+  (*pipe_reg)->set_num_mem_requests( n_accesses );
+  // JH : set undeterministic register data
+  if ( m_scoreboard->check_undet(warp_id, *pipe_reg) )
+	(*pipe_reg)->f_undet = true;
+// -------------------------
 
   if (next_inst->op == BARRIER_OP) {
     m_warp[warp_id]->store_info_of_last_inst_at_barrier(*pipe_reg);
@@ -1022,6 +1165,39 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
 
   m_scoreboard->reserveRegisters(*pipe_reg);
   m_warp[warp_id]->set_next_pc(next_inst->pc + next_inst->isize);
+
+
+// JH : check if an instruction is ld.global or branches
+	bool f_dep_ld = false;
+	bool f_dep_br = false;
+
+	if ( (*pipe_reg)->is_load() && ( ((*pipe_reg)->space.get_type()==local_space) || ((*pipe_reg)->space.get_type()==global_space) ) )
+		f_dep_ld = true;
+
+	if ( (*pipe_reg)->pred > 0 )
+		f_dep_br = true;
+
+	(*pipe_reg)->f_ld_global = f_dep_ld;
+
+#if (PRF_LD_CNT)
+	// JH : count load instructions by PC
+	if ( f_dep_ld )	{ // load instruction accessing global memory
+		m_warp[warp_id]->add_ld_cnt( *pipe_reg );
+
+		if ( m_scoreboard->check_undet(warp_id, *pipe_reg) )
+			m_warp[warp_id]->add_ld_undet_cnt( *pipe_reg );
+
+		if ( m_scoreboard->check_det(warp_id, *pipe_reg) )
+			m_warp[warp_id]->add_ld_det_cnt( *pipe_reg );
+	}
+#endif	// PRF_LD_CNT
+
+	// JH : check MSHR entries
+	(*pipe_reg)->m_num_mshr_at_issue = m_ldst_unit->get_L1D_num_mshr();
+
+	// JH : check number of memory requests by different active masks
+	unsigned n_am = active_mask.count();
+	//unsigned n_accesses = (*pipe_reg)->accessq_count();
 }
 
 void shader_core_ctx::issue() {

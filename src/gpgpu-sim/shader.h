@@ -55,6 +55,10 @@
 #include "stats.h"
 #include "traffic_breakdown.h"
 
+#include "mem_latency_stat.h" //JH added
+
+#define PRF_LD_CNT 1
+
 #define NO_OP_FLAG 0xFF
 
 /* READ_PACKET_SIZE:
@@ -121,10 +125,19 @@ class shd_warp_t {
     // Jin: cdp support
     m_cdp_latency = 0;
     m_cdp_dummy = false;
+
+   // JH
+#if(PRF_LD_CNT)
+    m_ld_cnt.clear();
+    m_ld_det_cnt.clear();
+    m_ld_undet_cnt.clear();
+#endif	// PRF_LD_CNT
   }
   void init(address_type start_pc, unsigned cta_id, unsigned wid,
             const std::bitset<MAX_WARP_SIZE> &active,
-            unsigned dynamic_warp_id) {
+            unsigned dynamic_warp_id, 
+	    dim3 cta_id_3d, // JH
+	    dim3 grid_dim) { // JH
     m_cta_id = cta_id;
     m_warp_id = wid;
     m_dynamic_warp_id = dynamic_warp_id;
@@ -138,6 +151,15 @@ class shd_warp_t {
     // Jin: cdp support
     m_cdp_latency = 0;
     m_cdp_dummy = false;
+
+    // JH
+    m_cta_id_3d = cta_id_3d;
+    m_grid_dim = grid_dim;
+    #if(PRF_LD_CNT)
+	m_ld_cnt.clear();
+	m_ld_det_cnt.clear();
+	m_ld_undet_cnt.clear();
+    #endif
   }
 
   bool functional_done() const;
@@ -237,6 +259,21 @@ class shd_warp_t {
 
   unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
   unsigned get_warp_id() const { return m_warp_id; }
+
+ #if(PRF_LD_CNT) //JH : for counting repeated load instructions in a warp
+  std::map<address_type/*PC*/, unsigned/*count*/> m_ld_cnt;
+  std::map<address_type/*PC*/, unsigned/*count*/> m_ld_undet_cnt;
+  std::map<address_type/*PC*/, unsigned/*count*/> m_ld_det_cnt;
+  void add_ld_cnt( const warp_inst_t* inst );
+  void add_ld_undet_cnt( const warp_inst_t* inst );
+  void add_ld_det_cnt( const warp_inst_t* inst );
+#endif //PRF_LD_CNT
+
+  dim3 m_cta_id_3d;
+  dim3 m_grid_dim;
+
+  unsigned get_cta_id_global() const { return m_cta_id_3d.x + (m_cta_id_3d.y*m_grid_dim.x) + (m_cta_id_3d.z*m_grid_dim.y*m_grid_dim.x); }
+  // JH
 
   class shader_core_ctx * get_shader() { return m_shader; }
  private:
@@ -1302,6 +1339,11 @@ class ldst_unit : public pipelined_simd_unit {
   void get_L1C_sub_stats(struct cache_sub_stats &css) const;
   void get_L1T_sub_stats(struct cache_sub_stats &css) const;
 
+  // JH : reporting mshr information
+  unsigned get_L1D_num_mshr() const { return ((m_L1D) ? m_L1D->num_entries_mshr(): 0); }
+  unsigned get_L1C_num_mshr() const { return ((m_L1C) ? m_L1C->num_entries_mshr(): 0); }
+  unsigned get_L1T_num_mshr() const { return 0; }
+
  protected:
   ldst_unit(mem_fetch_interface *icnt,
             shader_core_mem_fetch_allocator *mf_allocator,
@@ -1670,6 +1712,17 @@ struct shader_core_stats_pod {
   unsigned *dual_issue_nums;
 
   unsigned ctas_completed;
+  
+  #if(PRF_LD_CNT) // JH : count load instrutions by PC
+  std::map<address_type/*PC*/, unsigned/*# of ld*/> m_ld_cnt;
+  std::map<address_type/*PC*/, unsigned/*# of warps*/> m_ld_warp_cnt;
+
+  // JH : count undet / det load instructions by PC
+  std::map<address_type/*PC*/, unsigned/*counts*/> m_ld_undet_cnt;
+  std::map<address_type/*PC*/, unsigned/*counts*/> m_ld_det_cnt;
+  #endif  // PRF_LD_CNT
+
+  
   // memory access classification
   int gpgpu_n_mem_read_local;
   int gpgpu_n_mem_write_local;
@@ -1689,6 +1742,7 @@ struct shader_core_stats_pod {
   unsigned *gpgpu_n_shmem_bank_access;
   long *n_simt_to_mem;  // Interconnect power stats
   long *n_mem_to_simt;
+
 };
 
 class shader_core_stats : public shader_core_stats_pod {
@@ -1795,6 +1849,15 @@ class shader_core_stats : public shader_core_stats_pod {
 
     m_shader_dynamic_warp_issue_distro.resize(config->num_shader());
     m_shader_warp_slot_issue_distro.resize(config->num_shader());
+
+    #if(PRF_LD_CNT) // JH
+        m_ld_cnt.clear();
+        m_ld_warp_cnt.clear();
+
+        m_ld_det_cnt.clear();
+        m_ld_undet_cnt.clear();
+    #endif      // PRF_LD_CNT
+
   }
 
   ~shader_core_stats() {
@@ -2110,6 +2173,12 @@ class shader_core_ctx : public core_t {
   }
   bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
+#if(PRF_LD_CNT) // JH : update global load count
+  void update_ld_cnt( unsigned wid );
+  unsigned get_ld_cnt( unsigned wid, address_type pc ) const { return m_warp[wid]->m_ld_cnt.find(pc)->second; }
+  void force_update_ld_cnt();
+#endif	// PRF_LD_CNT
+
  protected:
   unsigned inactive_lanes_accesses_sfu(unsigned active_count, double latency) {
     return (((32 - active_count) >> 1) * latency) +
@@ -2144,7 +2213,9 @@ class shader_core_ctx : public core_t {
   // (execution-driven vs trace-driven)
   virtual void init_warps(unsigned cta_id, unsigned start_thread,
                           unsigned end_thread, unsigned ctaid, int cta_size,
-                          kernel_info_t &kernel);
+                          kernel_info_t &kernel,
+			  dim3 cta_id_3d,  // JH
+			  dim3 grid_dim); //JH
   virtual void checkExecutionStatusAndUpdate(warp_inst_t &inst, unsigned t,
                                              unsigned tid) = 0;
   virtual void func_exec_inst(warp_inst_t &inst) = 0;
@@ -2345,6 +2416,13 @@ class simt_core_cluster {
   float get_current_occupancy(unsigned long long &active,
                               unsigned long long &total) const;
   virtual void create_shader_core_ctx() = 0;
+
+  #if(PRF_LD_CNT) // JH 
+  void force_update_ld_cnt() {
+	  for (unsigned i=0; i < m_config->n_simt_cores_per_cluster; i++)
+		m_core[i]->force_update_ld_cnt();
+  };
+  #endif // PRF_LD_CNT
 
  protected:
   unsigned m_cluster_id;

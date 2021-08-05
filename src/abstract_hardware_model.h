@@ -1152,6 +1152,36 @@ class warp_inst_t : public inst_t {
   unsigned get_schd_id() const { return m_scheduler_id; }
   active_mask_t get_warp_active_mask() const { return m_warp_active_mask; }
 
+  // ----------- JH ------
+  void set_num_mem_requests( unsigned num_req ) { m_num_mem_requests = num_req; }
+  unsigned get_num_mem_requests() const { return m_num_mem_requests; }
+  
+  unsigned m_num_mshr_at_issue;	// number of entries in MSHR seen at issue
+  unsigned pipe_delay;	// delay until the first memory request reases cache	
+  unsigned mshr_delay;	// delay until all memory requests are assigned in MSHR
+  bool f_touch_cache;		// flag whether a warp touches cache
+  bool f_undet;			// flag whether register is undeterministic
+  bool f_ld_global;		// flag whether load accesses global memory
+  
+  // JH : logging timestamps for memory subsystems (size of array = SIMT lane width)
+  unsigned long long m_cache_cycle[32];
+  unsigned long long m_sm_icnt_cycle[32];
+  unsigned long long m_icnt_sm_cycle[32];
+  unsigned long long m_resp_cycle[32];
+  unsigned long long m_wb_cycle;
+
+  unsigned m_cache_cycle_ptr;
+  unsigned m_sm_icnt_cycle_ptr;
+  unsigned m_icnt_sm_cycle_ptr;
+  unsigned m_resp_cycle_ptr;
+
+  // JH : count status of cache access
+  unsigned m_l1cache_status[4];
+  unsigned m_l2cache_status[4];
+
+  // JH : protected --> public
+  std::list<mem_access_t> m_accessq;
+  // --------------------
  protected:
   unsigned m_uid;
   bool m_empty;
@@ -1186,9 +1216,14 @@ class warp_inst_t : public inst_t {
   bool m_per_scalar_thread_valid;
   std::vector<per_thread_info> m_per_scalar_thread;
   bool m_mem_accesses_created;
-  std::list<mem_access_t> m_accessq;
+
+//  std::list<mem_access_t> m_accessq;
 
   unsigned m_scheduler_id;  // the scheduler that issues this inst
+  
+  // JH
+  unsigned long long m_execute_cycle;		// time stamp at execution
+  unsigned m_num_mem_requests;	// number of generated memory requests	
 
   // Jin: cdp support
  public:
