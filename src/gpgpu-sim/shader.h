@@ -57,7 +57,7 @@
 
 #include "mem_latency_stat.h" //JH added
 
-#define PRF_LD_CNT 1
+
 
 #define NO_OP_FLAG 0xFF
 

@@ -78,7 +78,7 @@ class gpgpu_sim_wrapper {};
 #include <sstream>
 #include <string>
 
-#define PRF_LD_CNT 1
+
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 bool g_interactive_debugger_enabled = false;
