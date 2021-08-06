@@ -965,43 +965,59 @@ void gpgpu_sim::reinit_clock_domains(void) {
   l2_time = 0;
 }
 
+// gunjae: inserted print_stats() function to enable printing statistics when GPGPU-Sim terminated
 bool gpgpu_sim::active() {
+  // terminated by max cycles
   if (m_config.gpu_max_cycle_opt && 
 		  (gpu_tot_sim_cycle + gpu_sim_cycle) >= m_config.gpu_max_cycle_opt){
-  	#if (PRF_LD_CNT)
-		for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
-			m_cluster[i]->force_update_ld_cnt();
-	#endif
-  
+    printf("GK: over max cycles @ %9lld\n", gpu_tot_sim_cycle+gpu_sim_cycle);
+  #if (PRF_LD_CNT)
+    for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
+      m_cluster[i]->force_update_ld_cnt();
+  #endif
+	print_stats();
+	abort();
     return false;
   }
+  // terminated by max instruction count
   if (m_config.gpu_max_insn_opt &&
       (gpu_tot_sim_insn + gpu_sim_insn) >= m_config.gpu_max_insn_opt){
-  	#if (PRF_LD_CNT)
-		for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
-			m_cluster[i]->force_update_ld_cnt();
-	#endif
+    printf("GK: over max instructions @ %9lld\n", gpu_tot_sim_cycle+gpu_sim_cycle);
+  #if (PRF_LD_CNT)
+    for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
+      m_cluster[i]->force_update_ld_cnt();
+  #endif
+	print_stats();
+	abort();
     return false;
   }
+  // terminated by max issued CTA count
   if (m_config.gpu_max_cta_opt &&
       (gpu_tot_issued_cta >= m_config.gpu_max_cta_opt)){
-  	#if (PRF_LD_CNT)
-		for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
-			m_cluster[i]->force_update_ld_cnt();
-	#endif	
-  
+    printf("GK: over max issued CTAs @ %9lld\n", gpu_tot_sim_cycle+gpu_sim_cycle);
+  #if (PRF_LD_CNT)
+    for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
+      m_cluster[i]->force_update_ld_cnt();
+  #endif
+	print_stats();
+	abort();
     return false;
   }
+  // terminated by max completed CTA count
   if (m_config.gpu_max_completed_cta_opt &&
       (gpu_completed_cta >= m_config.gpu_max_completed_cta_opt)){
-
-	#if (PRF_LD_CNT)
-		for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
-			m_cluster[i]->force_update_ld_cnt();
-	#endif
+    printf("GK: over max completed CTAs @ %9lld\n", gpu_tot_sim_cycle+gpu_sim_cycle);
+  #if (PRF_LD_CNT)
+    for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
+      m_cluster[i]->force_update_ld_cnt();
+  #endif
+	print_stats();
+	abort();
     return false;
   }
+  // terminated by deadlocks
   if (m_config.gpu_deadlock_detect && gpu_deadlock) return false;
+
   for (unsigned i = 0; i < m_shader_config->n_simt_clusters; i++)
     if (m_cluster[i]->get_not_completed() > 0) return true;
   ;
