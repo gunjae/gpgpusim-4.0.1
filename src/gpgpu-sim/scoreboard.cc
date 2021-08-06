@@ -145,7 +145,7 @@ void Scoreboard::reserveRegisters(const class warp_inst_t* inst) {
 			    inst->space.get_type() == local_space  ||
 			    inst->space.get_type() == shared_space ||
 			    inst->space.get_type() == tex_space ) ) ) {
-	  for ( unsigned r = 0; r < 4; r++ ) {
+	  for ( unsigned r = 0; r < MAX_OUTPUT_VALUES; r++ ) {
 		if ( inst->out[r] > 0 )
 			undet_regs[ inst->warp_id() ].insert( inst->out[r] );
 	}

@@ -717,6 +717,41 @@ void shader_core_stats::print(FILE *fout) const {
   m_outgoing_traffic_stats->print(fout);
   m_incoming_traffic_stats->print(fout);
 
+
+   // JH : printing additional stats of SMs
+#if(PRF_IDLE_PIPE)
+   // additional stats for SMs
+   fprintf(fout, "GK: ----- idle cycles in execution units -------------------------\n");
+   fprintf(fout, "JH: SP, SFU, MEM, DP, INT, TENSOR_CORE -------------------------\n");
+
+   for (unsigned i=0; i < m_config->num_shader(); i++) {
+	  double ratio[6];
+	  ratio[0] = (double)m_idle_sp[i] / shader_cycles[i];
+	  ratio[1] = (double)m_idle_sfu[i] / shader_cycles[i];
+	  ratio[2] = (double)m_idle_mem[i] / shader_cycles[i];
+	  ratio[3] = (double)m_idle_dp[i] / shader_cycles[i];
+          ratio[4] = (double)m_idle_int[i] / shader_cycles[i];
+          ratio[5] = (double)m_idle_tensor_core[i] / shader_cycles[i];
+
+	fprintf(fout, "GK: IDLE[%02u](%9lld, %9lld, %9lld, %9lld, %9lld, %9lld) / %9lld", i, m_idle_sp[i], m_idle_sfu[i], m_idle_mem[i], m_idle_dp[i], m_idle_int[i], m_idle_tensor_core[i], shader_cycles[i]);
+	fprintf(fout, " = (%1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf)\n", ratio[0], ratio[1], ratio[2], ratio[3], ratio[4], ratio[5]);
+   	if(m_config->m_specialized_unit.size()){
+		fprintf(fout, "JH: SPECIALIZED IDLE[%02u]", i);
+		for(unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
+        		double spec_ratio[m_config->m_specialized_unit.size()];
+			spec_ratio[j] = (double)m_idle_spec[j][i] / shader_cycles[i];
+			//fprintf(fout, "%9lld ", m_idle_spec[j][i] );
+			fprintf(fout, " (%1.3lf)", spec_ratio[j]);
+   		}
+		fprintf(fout, "\n");
+	}
+   }
+
+
+   fprintf(fout, "GK: -------------------------------------------------------------\n");
+
+#endif	// PRF_IDLE_PIPE
+
 #if(PRF_LD_CNT) // JH
    fprintf(fout, "GK: ----- number of repeated load in a warp ---------------------\n");
    std::map<address_type/*PC*/, unsigned/*# of ld*/>::const_iterator it_c;
@@ -1899,6 +1934,16 @@ void shader_core_ctx::warp_inst_complete(const warp_inst_t &inst) {
     m_stats->m_num_sfu_committed[m_sid]++;
   else if (inst.op_pipe == MEM__OP)
     m_stats->m_num_mem_committed[m_sid]++;
+  
+  // JH : tensor core, DP, INT, SPECIALIZED operation
+  else if (inst.op_pipe == TENSOR_CORE__OP)
+    m_stats->m_num_tensor_core_committed[m_sid]++;
+  else if (inst.op_pipe == DP__OP)
+    m_stats->m_num_dp_committed[m_sid]++;
+  else if (inst.op_pipe == INTP__OP)
+    m_stats->m_num_int_committed[m_sid]++;
+  else if (inst.op_pipe == SPECIALIZED__OP)
+    m_stats->m_num_spec_committed[m_sid]++;
 
   if (m_config->gpgpu_clock_gated_lanes == false)
     m_stats->m_num_sim_insn[m_sid] += m_config->warp_size;
@@ -3541,6 +3586,27 @@ void shader_core_ctx::cycle() {
     decode();
     fetch();
   }
+
+  #if(PRF_IDLE_PIPE)
+	// JH : check if pipeline inputs of execution units are available (for profiling)
+	if (m_pipeline_reg[ID_OC_SP].has_free())
+		m_stats->m_idle_sp[m_sid]++;
+	if (m_pipeline_reg[ID_OC_SFU].has_free())
+		m_stats->m_idle_sfu[m_sid]++;
+	if (m_pipeline_reg[ID_OC_MEM].has_free())
+		m_stats->m_idle_mem[m_sid]++;
+	if (m_pipeline_reg[ID_OC_DP].has_free())
+                m_stats->m_idle_dp[m_sid]++;
+        if (m_pipeline_reg[ID_OC_INT].has_free())
+                m_stats->m_idle_int[m_sid]++;
+        if (m_pipeline_reg[ID_OC_TENSOR_CORE].has_free())
+                m_stats->m_idle_tensor_core[m_sid]++;
+	for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
+        	if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
+			m_stats->m_idle_spec[j][m_sid]++;
+        }
+	               
+  #endif	// PRF_IDLE_PIPE
 }
 
 // Flushes all content of the cache to memory

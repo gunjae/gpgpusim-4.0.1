@@ -1679,6 +1679,11 @@ struct shader_core_stats_pod {
   unsigned *m_num_sfu_committed;
   unsigned *m_num_tensor_core_committed;
   unsigned *m_num_mem_committed;
+// JH : DP, INTP, special committed
+  unsigned *m_num_int_committed;
+  unsigned *m_num_dp_committed;
+  unsigned *m_num_spec_committed;
+
   unsigned *m_read_regfile_acesses;
   unsigned *m_write_regfile_acesses;
   unsigned *m_non_rf_operands;
@@ -1712,7 +1717,19 @@ struct shader_core_stats_pod {
   unsigned *dual_issue_nums;
 
   unsigned ctas_completed;
-  
+ 
+  // JH :  count clocks when pipeline is available
+  #if(PRF_IDLE_PIPE)
+	unsigned long long *m_idle_sp;
+	unsigned long long *m_idle_sfu;
+	unsigned long long *m_idle_mem;
+	unsigned long long *m_idle_dp;
+        unsigned long long *m_idle_int;
+        unsigned long long *m_idle_tensor_core;
+	
+	unsigned long long **m_idle_spec;
+  #endif	// PRF_IDLE_PIPE
+
   #if(PRF_LD_CNT) // JH : count load instrutions by PC
   std::map<address_type/*PC*/, unsigned/*# of ld*/> m_ld_cnt;
   std::map<address_type/*PC*/, unsigned/*# of warps*/> m_ld_warp_cnt;
@@ -1821,6 +1838,20 @@ class shader_core_stats : public shader_core_stats_pod {
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
     m_num_mem_committed =
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
+// JH : DP, INTP, SPEC
+    m_num_int_committed =
+        (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
+    m_num_dp_committed =
+        (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
+    m_num_spec_committed =
+        (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
+
+/*    for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
+                m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+
+    }*/
+
+
     m_read_regfile_acesses =
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
     m_write_regfile_acesses =
@@ -1849,6 +1880,24 @@ class shader_core_stats : public shader_core_stats_pod {
 
     m_shader_dynamic_warp_issue_distro.resize(config->num_shader());
     m_shader_warp_slot_issue_distro.resize(config->num_shader());
+
+
+	// JH : array for profiling idle pipelines of execution units
+    #if(PRF_IDLE_PIPE)
+	m_idle_sp = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+	m_idle_sfu = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+	m_idle_mem = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+	m_idle_dp = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+        m_idle_int = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+        m_idle_tensor_core = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+	
+	m_idle_spec = (unsigned long long **) calloc(config->num_shader(), sizeof(unsigned long long));
+	for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
+                m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+
+        }
+
+    #endif	// PRF_IDLE_PIPE
 
     #if(PRF_LD_CNT) // JH
         m_ld_cnt.clear();

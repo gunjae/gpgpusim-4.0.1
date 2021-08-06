@@ -1,0 +1,9 @@
+# setup for CUDA and GPGPU-Sim
+function setup_gpgpusim() {
+	PATH=$PATH:/usr/local/cuda-10.1/bin
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-10.1/lib64
+	export CUDA_INSTALL_PATH=/usr/local/cuda-10.1
+	export PTXAS_CUDA_INSTALL_PATH=/usr/local/cuda-10.1
+}
+
+setup_gpgpusim
