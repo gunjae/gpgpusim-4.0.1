@@ -127,17 +127,17 @@ class shd_warp_t {
     m_cdp_dummy = false;
 
    // JH
-#if(PRF_LD_CNT)
+#if (PRF_LD_CNT)
     m_ld_cnt.clear();
     m_ld_det_cnt.clear();
     m_ld_undet_cnt.clear();
-#endif	// PRF_LD_CNT
+#endif // PRF_LD_CNT
   }
   void init(address_type start_pc, unsigned cta_id, unsigned wid,
             const std::bitset<MAX_WARP_SIZE> &active,
             unsigned dynamic_warp_id, 
-	    dim3 cta_id_3d, // JH
-	    dim3 grid_dim) { // JH
+            dim3 cta_id_3d, // JH
+            dim3 grid_dim) { // JH
     m_cta_id = cta_id;
     m_warp_id = wid;
     m_dynamic_warp_id = dynamic_warp_id;
@@ -155,11 +155,11 @@ class shd_warp_t {
     // JH
     m_cta_id_3d = cta_id_3d;
     m_grid_dim = grid_dim;
-    #if(PRF_LD_CNT)
+  #if (PRF_LD_CNT)
 	m_ld_cnt.clear();
 	m_ld_det_cnt.clear();
 	m_ld_undet_cnt.clear();
-    #endif
+  #endif
   }
 
   bool functional_done() const;
@@ -260,7 +260,7 @@ class shd_warp_t {
   unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
   unsigned get_warp_id() const { return m_warp_id; }
 
- #if(PRF_LD_CNT) //JH : for counting repeated load instructions in a warp
+#if (PRF_LD_CNT) //JH : for counting repeated load instructions in a warp
   std::map<address_type/*PC*/, unsigned/*count*/> m_ld_cnt;
   std::map<address_type/*PC*/, unsigned/*count*/> m_ld_undet_cnt;
   std::map<address_type/*PC*/, unsigned/*count*/> m_ld_det_cnt;
@@ -1719,25 +1719,25 @@ struct shader_core_stats_pod {
   unsigned ctas_completed;
  
   // JH :  count clocks when pipeline is available
-  #if(PRF_IDLE_PIPE)
-	unsigned long long *m_idle_sp;
-	unsigned long long *m_idle_sfu;
-	unsigned long long *m_idle_mem;
-	unsigned long long *m_idle_dp;
-        unsigned long long *m_idle_int;
-        unsigned long long *m_idle_tensor_core;
-	
-	unsigned long long **m_idle_spec;
-  #endif	// PRF_IDLE_PIPE
+#if(PRF_IDLE_PIPE)
+  unsigned long long *m_idle_sp;
+  unsigned long long *m_idle_sfu;
+  unsigned long long *m_idle_mem;
+  unsigned long long *m_idle_dp;
+  unsigned long long *m_idle_int;
+  unsigned long long *m_idle_tensor_core;
+  	
+  unsigned long long **m_idle_spec;
+#endif // PRF_IDLE_PIPE
 
-  #if(PRF_LD_CNT) // JH : count load instrutions by PC
+#if (PRF_LD_CNT) // JH : count load instrutions by PC
   std::map<address_type/*PC*/, unsigned/*# of ld*/> m_ld_cnt;
   std::map<address_type/*PC*/, unsigned/*# of warps*/> m_ld_warp_cnt;
 
   // JH : count undet / det load instructions by PC
   std::map<address_type/*PC*/, unsigned/*counts*/> m_ld_undet_cnt;
   std::map<address_type/*PC*/, unsigned/*counts*/> m_ld_det_cnt;
-  #endif  // PRF_LD_CNT
+#endif // PRF_LD_CNT
 
   
   // memory access classification
@@ -1883,30 +1883,27 @@ class shader_core_stats : public shader_core_stats_pod {
 
 
 	// JH : array for profiling idle pipelines of execution units
-    #if(PRF_IDLE_PIPE)
-	m_idle_sp = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
-	m_idle_sfu = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
-	m_idle_mem = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
-	m_idle_dp = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
-        m_idle_int = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
-        m_idle_tensor_core = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+  #if (PRF_IDLE_PIPE)
+    m_idle_sp = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+    m_idle_sfu = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+    m_idle_mem = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+    m_idle_dp = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+    m_idle_int = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+    m_idle_tensor_core = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
 	
-	m_idle_spec = (unsigned long long **) calloc(config->num_shader(), sizeof(unsigned long long));
-	for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
-                m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+    m_idle_spec = (unsigned long long **) calloc(config->num_shader(), sizeof(unsigned long long));
+    for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
+      m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
+    }
+  #endif // PRF_IDLE_PIPE
 
-        }
-
-    #endif	// PRF_IDLE_PIPE
-
-    #if(PRF_LD_CNT) // JH
-        m_ld_cnt.clear();
-        m_ld_warp_cnt.clear();
-
-        m_ld_det_cnt.clear();
-        m_ld_undet_cnt.clear();
-    #endif      // PRF_LD_CNT
-
+  #if (PRF_LD_CNT) // JH
+    m_ld_cnt.clear();
+    m_ld_warp_cnt.clear();
+    
+    m_ld_det_cnt.clear();
+    m_ld_undet_cnt.clear();
+  #endif // PRF_LD_CNT
   }
 
   ~shader_core_stats() {
@@ -2222,11 +2219,11 @@ class shader_core_ctx : public core_t {
   }
   bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
-#if(PRF_LD_CNT) // JH : update global load count
+#if (PRF_LD_CNT) // JH : update global load count
   void update_ld_cnt( unsigned wid );
   unsigned get_ld_cnt( unsigned wid, address_type pc ) const { return m_warp[wid]->m_ld_cnt.find(pc)->second; }
   void force_update_ld_cnt();
-#endif	// PRF_LD_CNT
+#endif // PRF_LD_CNT
 
  protected:
   unsigned inactive_lanes_accesses_sfu(unsigned active_count, double latency) {
@@ -2466,12 +2463,12 @@ class simt_core_cluster {
                               unsigned long long &total) const;
   virtual void create_shader_core_ctx() = 0;
 
-  #if(PRF_LD_CNT) // JH 
+#if (PRF_LD_CNT) // JH 
   void force_update_ld_cnt() {
-	  for (unsigned i=0; i < m_config->n_simt_cores_per_cluster; i++)
-		m_core[i]->force_update_ld_cnt();
-  };
-  #endif // PRF_LD_CNT
+    for (unsigned i=0; i < m_config->n_simt_cores_per_cluster; i++)
+      m_core[i]->force_update_ld_cnt();
+  }
+#endif // PRF_LD_CNT
 
  protected:
   unsigned m_cluster_id;

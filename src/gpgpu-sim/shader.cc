@@ -718,67 +718,64 @@ void shader_core_stats::print(FILE *fout) const {
   m_incoming_traffic_stats->print(fout);
 
 
-   // JH : printing additional stats of SMs
-#if(PRF_IDLE_PIPE)
-   // additional stats for SMs
-   fprintf(fout, "GK: ----- idle cycles in execution units -------------------------\n");
-   fprintf(fout, "JH: SP, SFU, MEM, DP, INT, TENSOR_CORE -------------------------\n");
+  // JH : printing additional stats of SMs
+#if (PRF_IDLE_PIPE)
+  // additional stats for SMs
+  fprintf(fout, "GK: ----- idle cycles in execution units -------------------------\n");
+  fprintf(fout, "JH: SP, SFU, MEM, DP, INT, TENSOR_CORE -------------------------\n");
 
-   for (unsigned i=0; i < m_config->num_shader(); i++) {
-	  double ratio[6];
-	  ratio[0] = (double)m_idle_sp[i] / shader_cycles[i];
-	  ratio[1] = (double)m_idle_sfu[i] / shader_cycles[i];
-	  ratio[2] = (double)m_idle_mem[i] / shader_cycles[i];
-	  ratio[3] = (double)m_idle_dp[i] / shader_cycles[i];
-          ratio[4] = (double)m_idle_int[i] / shader_cycles[i];
-          ratio[5] = (double)m_idle_tensor_core[i] / shader_cycles[i];
+  for (unsigned i=0; i < m_config->num_shader(); i++) {
+    double ratio[6];
+    ratio[0] = (double)m_idle_sp[i] / shader_cycles[i];
+    ratio[1] = (double)m_idle_sfu[i] / shader_cycles[i];
+    ratio[2] = (double)m_idle_mem[i] / shader_cycles[i];
+    ratio[3] = (double)m_idle_dp[i] / shader_cycles[i];
+    ratio[4] = (double)m_idle_int[i] / shader_cycles[i];
+    ratio[5] = (double)m_idle_tensor_core[i] / shader_cycles[i];
 
-	fprintf(fout, "GK: IDLE[%02u](%9lld, %9lld, %9lld, %9lld, %9lld, %9lld) / %9lld", i, m_idle_sp[i], m_idle_sfu[i], m_idle_mem[i], m_idle_dp[i], m_idle_int[i], m_idle_tensor_core[i], shader_cycles[i]);
-	fprintf(fout, " = (%1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf)\n", ratio[0], ratio[1], ratio[2], ratio[3], ratio[4], ratio[5]);
-   	if(m_config->m_specialized_unit.size()){
-		fprintf(fout, "JH: SPECIALIZED IDLE[%02u]", i);
-		for(unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
-        		double spec_ratio[m_config->m_specialized_unit.size()];
-			spec_ratio[j] = (double)m_idle_spec[j][i] / shader_cycles[i];
-			//fprintf(fout, "%9lld ", m_idle_spec[j][i] );
-			fprintf(fout, " (%1.3lf)", spec_ratio[j]);
-   		}
-		fprintf(fout, "\n");
-	}
-   }
-
-
-   fprintf(fout, "GK: -------------------------------------------------------------\n");
-
+    fprintf(fout, "GK: IDLE[%02u](%9lld, %9lld, %9lld, %9lld, %9lld, %9lld) / %9lld", i, m_idle_sp[i], m_idle_sfu[i], m_idle_mem[i], m_idle_dp[i], m_idle_int[i], m_idle_tensor_core[i], shader_cycles[i]);
+    fprintf(fout, " = (%1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf)\n", ratio[0], ratio[1], ratio[2], ratio[3], ratio[4], ratio[5]);
+  	if (m_config->m_specialized_unit.size() ) {
+   	  fprintf(fout, "JH: SPECIALIZED IDLE[%02u]", i);
+   	  for(unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
+       	double spec_ratio[m_config->m_specialized_unit.size()];
+   		spec_ratio[j] = (double)m_idle_spec[j][i] / shader_cycles[i];
+   		//fprintf(fout, "%9lld ", m_idle_spec[j][i] );
+   		fprintf(fout, " (%1.3lf)", spec_ratio[j]);
+      }
+   	fprintf(fout, "\n");
+    }
+  }
+ fprintf(fout, "GK: -------------------------------------------------------------\n");
 #endif	// PRF_IDLE_PIPE
 
-#if(PRF_LD_CNT) // JH
-   fprintf(fout, "GK: ----- number of repeated load in a warp ---------------------\n");
-   std::map<address_type/*PC*/, unsigned/*# of ld*/>::const_iterator it_c;
-   address_type pc;
-   unsigned n_ld, n_warp;
-   unsigned n_undet, n_det;
-   for ( it_c=m_ld_cnt.begin(); it_c!=m_ld_cnt.end(); ++it_c ) {
-	   pc = it_c->first;
-	   n_ld = it_c->second;
-	   n_warp = m_ld_warp_cnt.find(pc)->second;
-	   n_undet = m_ld_undet_cnt.find(pc)->second;
-	   n_det = m_ld_det_cnt.find(pc)->second;
-	   fprintf(fout, "GK: pc=0x%08x, %3.3f (%3d / %3d) (u:%3d, d:%3d)\n", pc, (float)n_ld / n_warp, n_ld, n_warp, n_undet, n_det );
-   }
-   fprintf(fout, "GK: -------------------------------------------------------------\n");
-   
-   fprintf(fout, "GK_Summary: ----- number of repeated load in a warp ---------------------\n");
-   fprintf(fout, "GK_Summary: pc, n_ld/n_warp, n_ld, n_warp, n_undet, n_det\n");
-   for ( it_c=m_ld_cnt.begin(); it_c!=m_ld_cnt.end(); ++it_c ) {
-	   pc = it_c->first;
-	   n_ld = it_c->second;
-	   n_warp = m_ld_warp_cnt.find(pc)->second;
-	   n_undet = m_ld_undet_cnt.find(pc)->second;
-	   n_det = m_ld_det_cnt.find(pc)->second;
-	   fprintf(fout, "GK_Summary, 0x%08x, %3.3f, %3d, %3d, %3d, %3d\n", pc, (float)n_ld / n_warp, n_ld, n_warp, n_undet, n_det );
-   }
-   fprintf(fout, "GK_Summary: -------------------------------------------------------------\n");
+#if (PRF_LD_CNT) // JH
+  fprintf(fout, "GK: ----- number of repeated load in a warp ---------------------\n");
+  std::map<address_type/*PC*/, unsigned/*# of ld*/>::const_iterator it_c;
+  address_type pc;
+  unsigned n_ld, n_warp;
+  unsigned n_undet, n_det;
+  for ( it_c=m_ld_cnt.begin(); it_c!=m_ld_cnt.end(); ++it_c ) {
+    pc = it_c->first;
+    n_ld = it_c->second;
+    n_warp = m_ld_warp_cnt.find(pc)->second;
+    n_undet = m_ld_undet_cnt.find(pc)->second;
+    n_det = m_ld_det_cnt.find(pc)->second;
+    fprintf(fout, "GK: pc=0x%08x, %3.3f (%3d / %3d) (u:%3d, d:%3d)\n", pc, (float)n_ld / n_warp, n_ld, n_warp, n_undet, n_det );
+  }
+  fprintf(fout, "GK: -------------------------------------------------------------\n");
+  
+  fprintf(fout, "GK_Summary: ----- number of repeated load in a warp ---------------------\n");
+  fprintf(fout, "GK_Summary: pc, n_ld/n_warp, n_ld, n_warp, n_undet, n_det\n");
+  for ( it_c=m_ld_cnt.begin(); it_c!=m_ld_cnt.end(); ++it_c ) {
+    pc = it_c->first;
+    n_ld = it_c->second;
+    n_warp = m_ld_warp_cnt.find(pc)->second;
+    n_undet = m_ld_undet_cnt.find(pc)->second;
+    n_det = m_ld_det_cnt.find(pc)->second;
+    fprintf(fout, "GK_Summary, 0x%08x, %3.3f, %3d, %3d, %3d, %3d\n", pc, (float)n_ld / n_warp, n_ld, n_warp, n_undet, n_det );
+  }
+  fprintf(fout, "GK_Summary: -------------------------------------------------------------\n");
 #endif	// PRF_LD_CNT
 
 }
@@ -3587,26 +3584,25 @@ void shader_core_ctx::cycle() {
     fetch();
   }
 
-  #if(PRF_IDLE_PIPE)
-	// JH : check if pipeline inputs of execution units are available (for profiling)
-	if (m_pipeline_reg[ID_OC_SP].has_free())
-		m_stats->m_idle_sp[m_sid]++;
-	if (m_pipeline_reg[ID_OC_SFU].has_free())
-		m_stats->m_idle_sfu[m_sid]++;
-	if (m_pipeline_reg[ID_OC_MEM].has_free())
-		m_stats->m_idle_mem[m_sid]++;
-	if (m_pipeline_reg[ID_OC_DP].has_free())
-                m_stats->m_idle_dp[m_sid]++;
-        if (m_pipeline_reg[ID_OC_INT].has_free())
-                m_stats->m_idle_int[m_sid]++;
-        if (m_pipeline_reg[ID_OC_TENSOR_CORE].has_free())
-                m_stats->m_idle_tensor_core[m_sid]++;
-	for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
-        	if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
-			m_stats->m_idle_spec[j][m_sid]++;
-        }
-	               
-  #endif	// PRF_IDLE_PIPE
+#if (PRF_IDLE_PIPE)
+  // JH : check if pipeline inputs of execution units are available (for profiling)
+  if (m_pipeline_reg[ID_OC_SP].has_free())
+    m_stats->m_idle_sp[m_sid]++;
+  if (m_pipeline_reg[ID_OC_SFU].has_free())
+    m_stats->m_idle_sfu[m_sid]++;
+  if (m_pipeline_reg[ID_OC_MEM].has_free())
+    m_stats->m_idle_mem[m_sid]++;
+  if (m_pipeline_reg[ID_OC_DP].has_free())
+    m_stats->m_idle_dp[m_sid]++;
+  if (m_pipeline_reg[ID_OC_INT].has_free())
+    m_stats->m_idle_int[m_sid]++;
+  if (m_pipeline_reg[ID_OC_TENSOR_CORE].has_free())
+    m_stats->m_idle_tensor_core[m_sid]++;
+  for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
+    if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
+    m_stats->m_idle_spec[j][m_sid]++;
+  }
+#endif	// PRF_IDLE_PIPE
 }
 
 // Flushes all content of the cache to memory

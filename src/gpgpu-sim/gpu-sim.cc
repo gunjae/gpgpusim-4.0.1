@@ -971,7 +971,7 @@ bool gpgpu_sim::active() {
   if (m_config.gpu_max_cycle_opt && 
 		  (gpu_tot_sim_cycle + gpu_sim_cycle) >= m_config.gpu_max_cycle_opt){
     printf("GK: over max cycles @ %9lld\n", gpu_tot_sim_cycle+gpu_sim_cycle);
-  #if(PRF_LD_CNT)
+  #if (PRF_LD_CNT)
     for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
       m_cluster[i]->force_update_ld_cnt();
   #endif
@@ -983,7 +983,7 @@ bool gpgpu_sim::active() {
   if (m_config.gpu_max_insn_opt &&
       (gpu_tot_sim_insn + gpu_sim_insn) >= m_config.gpu_max_insn_opt){
     printf("GK: over max instructions @ %9lld\n", gpu_tot_sim_cycle+gpu_sim_cycle);
-  #if(PRF_LD_CNT)
+  #if (PRF_LD_CNT)
     for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
       m_cluster[i]->force_update_ld_cnt();
   #endif
@@ -995,7 +995,7 @@ bool gpgpu_sim::active() {
   if (m_config.gpu_max_cta_opt &&
       (gpu_tot_issued_cta >= m_config.gpu_max_cta_opt)){
     printf("GK: over max issued CTAs @ %9lld\n", gpu_tot_sim_cycle+gpu_sim_cycle);
-  #if(PRF_LD_CNT)
+  #if (PRF_LD_CNT)
     for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
       m_cluster[i]->force_update_ld_cnt();
   #endif
@@ -1007,7 +1007,7 @@ bool gpgpu_sim::active() {
   if (m_config.gpu_max_completed_cta_opt &&
       (gpu_completed_cta >= m_config.gpu_max_completed_cta_opt)){
     printf("GK: over max completed CTAs @ %9lld\n", gpu_tot_sim_cycle+gpu_sim_cycle);
-  #if(PRF_LD_CNT)
+  #if (PRF_LD_CNT)
     for (unsigned i=0; i < m_shader_config->n_simt_clusters; i++)
       m_cluster[i]->force_update_ld_cnt();
   #endif
