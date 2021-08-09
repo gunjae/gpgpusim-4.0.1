@@ -55,9 +55,12 @@ endif
 
 CXXFLAGS += -I$(CUDA_INSTALL_PATH)/include
 
-#profiling
+# Profiling
 CXXFLAGS += -DPRF_LD_CNT=1
 CXXFLAGS += -DPRF_IDLE_PIPE=1
+
+# Cache configuration
+CXXFLAGS += -DFORCE_CACHE_CONFIG=1
 
 
 POWER_FLAGS=
