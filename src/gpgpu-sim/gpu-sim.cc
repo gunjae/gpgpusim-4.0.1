@@ -976,7 +976,7 @@ bool gpgpu_sim::active() {
       m_cluster[i]->force_update_ld_cnt();
   #endif
 	print_stats();
-	abort();
+//	abort();
     return false;
   }
   // terminated by max instruction count
@@ -988,7 +988,7 @@ bool gpgpu_sim::active() {
       m_cluster[i]->force_update_ld_cnt();
   #endif
 	print_stats();
-	abort();
+//	abort();
     return false;
   }
   // terminated by max issued CTA count
@@ -1000,7 +1000,7 @@ bool gpgpu_sim::active() {
       m_cluster[i]->force_update_ld_cnt();
   #endif
 	print_stats();
-	abort();
+//	abort();
     return false;
   }
   // terminated by max completed CTA count
@@ -1012,7 +1012,7 @@ bool gpgpu_sim::active() {
       m_cluster[i]->force_update_ld_cnt();
   #endif
 	print_stats();
-	abort();
+//	abort();
     return false;
   }
   // terminated by deadlocks
