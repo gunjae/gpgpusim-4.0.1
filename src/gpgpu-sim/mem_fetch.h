@@ -33,6 +33,7 @@
 #include "../abstract_hardware_model.h"
 #include "addrdec.h"
 
+
 enum mf_type {
   READ_REQUEST = 0,
   WRITE_REQUEST,
@@ -121,6 +122,14 @@ class mem_fetch {
   const warp_inst_t &get_inst() { return m_inst; }
   enum mem_fetch_status get_status() const { return m_status; }
 
+  // JH : get status cycle (timestamps for each status)
+  unsigned long long get_status_cycle( enum mem_fetch_status status ) const { return m_status_cycle[status]; }
+  unsigned long long get_status_cycle( unsigned n ) const { return (n<NUM_MEM_REQ_STAT)?m_status_cycle[n]:0; }
+  // JH : log cache access status
+  enum cache_request_status m_l1cache_status;
+  enum cache_request_status m_l2cache_status;
+
+  
   const memory_config *get_mem_config() { return m_mem_config; }
 
   unsigned get_num_flits(bool simt_to_mem);
@@ -168,6 +177,9 @@ class mem_fetch {
   const memory_config *m_mem_config;
   unsigned icnt_flit_size;
 
+  // JH : timestamps for each log
+  unsigned long long m_status_cycle[NUM_MEM_REQ_STAT];
+  
   mem_fetch
       *original_mf;  // this pointer is set up when a request is divided into
                      // sector requests at L2 cache (if the req size > L2 sector

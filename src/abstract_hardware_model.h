@@ -42,6 +42,16 @@ class gpgpu_context;
 #define MAX_INPUT_VALUES 24
 #define MAX_OUTPUT_VALUES 8
 
+// JH : moved from gpu-cache.h
+enum cache_request_status {
+	HIT = 0,
+	HIT_RESERVED,
+	MISS,
+	RESERVATION_FAIL,
+	SECTOR_MISS,
+	NUM_CACHE_REQUEST_STATUS,
+};
+
 enum _memory_space_t {
   undefined_space = 0,
   reg_space,
@@ -1153,6 +1163,13 @@ class warp_inst_t : public inst_t {
   active_mask_t get_warp_active_mask() const { return m_warp_active_mask; }
 
   // ----------- JH ------
+  // for loggin MSHR entries seen when a warp is issued and registered
+  // returning issue time stamp
+  unsigned long long get_issue_cycle() const { return issue_cycle; }
+  // setting and returning execution time stamp
+  void set_execute_cycle( unsigned long long cycle ) { m_execute_cycle = cycle; }
+  unsigned long long get_execute_cycle() const { return m_execute_cycle; }
+  
   void set_num_mem_requests( unsigned num_req ) { m_num_mem_requests = num_req; }
   unsigned get_num_mem_requests() const { return m_num_mem_requests; }
   
@@ -1175,9 +1192,10 @@ class warp_inst_t : public inst_t {
   unsigned m_icnt_sm_cycle_ptr;
   unsigned m_resp_cycle_ptr;
 
-  // JH : count status of cache access
-  unsigned m_l1cache_status[4];
-  unsigned m_l2cache_status[4];
+  // JH : count status of cache access 
+  // added SECTOR MISS
+  unsigned m_l1cache_status[5];
+  unsigned m_l2cache_status[5];
 
   // JH : protected --> public
   std::list<mem_access_t> m_accessq;

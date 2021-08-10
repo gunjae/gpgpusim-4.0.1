@@ -68,7 +68,8 @@ void warp_inst_t::issue(const active_mask_t &mask, unsigned warp_id,
   m_sm_icnt_cycle_ptr = 0;
   m_icnt_sm_cycle_ptr = 0;
   m_resp_cycle_ptr = 0;
-  for (unsigned r=0; r < 4; r++) {
+  // JH : added SECTOR MISS 4 -> 5 
+  for (unsigned r=0; r < 5; r++) {
 	  m_l1cache_status[r] = 0;
 	  m_l2cache_status[r] = 0;
   }

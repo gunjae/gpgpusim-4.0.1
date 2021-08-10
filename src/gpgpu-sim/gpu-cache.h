@@ -43,14 +43,15 @@
 
 enum cache_block_state { INVALID = 0, RESERVED, VALID, MODIFIED };
 
-enum cache_request_status {
+// JH : move to abstract_hardware_model.h
+/*enum cache_request_status {
   HIT = 0,
   HIT_RESERVED,
   MISS,
   RESERVATION_FAIL,
   SECTOR_MISS,
   NUM_CACHE_REQUEST_STATUS
-};
+};*/
 
 enum cache_reservation_fail_reason {
   LINE_ALLOC_FAIL = 0,  // all line are reserved

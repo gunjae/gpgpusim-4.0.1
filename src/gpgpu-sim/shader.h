@@ -87,6 +87,122 @@ enum exec_unit_type_t {
   SPECIALIZED = 7
 };
 
+// JH : function to analyze basic statistics
+struct cycle_stat {
+  cycle_stat() { avg = 0; std = 0; gap = 0; min = 0; max = 0; }
+  double avg;
+  double std;
+  unsigned long long gap;
+  unsigned long long min;
+  unsigned long long max;
+};
+
+// JH : data structure for load timestamps per warp
+struct ldtime_stat {
+  ldtime_stat() { init(); }
+
+  unsigned m_num_mf;	// number of memory requests
+  // number of status after cache accesses
+  // JH : added SECTOR MISS 
+  unsigned m_l1cache_status[5];
+  unsigned m_l2cache_status[5];
+  // timestamps log
+  unsigned long long m_cache_cycle[32];
+  unsigned long long m_sm_icnt_cycle[32];
+  unsigned long long m_icnt_sm_cycle[32];
+  unsigned long long m_resp_cycle[32];
+  unsigned long long m_ex_cycle;	// when cache access is done
+  unsigned long long m_wb_cycle;
+  // number of timestamps
+  unsigned m_num_cache;
+  unsigned m_num_sm_icnt;
+  unsigned m_num_icnt_sm;
+  unsigned m_num_resp;
+	
+  // function: initialization
+  void init() { 
+    m_num_mf = 0;
+    m_num_cache = 0; m_num_sm_icnt = 0; m_num_icnt_sm = 0; m_num_resp = 0;
+
+    // JH : status 4 -> 5
+    for (unsigned i=0; i < 5; i++) {
+      m_l1cache_status[i] = 0;
+      m_l2cache_status[i] = 0;
+    }
+    for (unsigned i=0; i < 32; i++) {
+      m_cache_cycle[i] = 0;
+      m_sm_icnt_cycle[i] = 0;
+      m_icnt_sm_cycle[i] = 0;
+      m_resp_cycle[i] = 0;	
+    }
+    m_ex_cycle = 0;
+    m_wb_cycle = 0;	
+  }
+};
+
+// JH : data structure for analyzing ld_time
+struct ldtime_stat_acc {
+
+  ldtime_stat_acc() { init(); }
+
+  enum _memory_space_t space;
+  bool f_undet;
+  // 32 arrays = number of possible memory requests
+  unsigned long num[32];	// global, texture, const
+  double ex_cycle[32];
+  double wb_cycle[32];
+  double cache_cycle[32];
+  double sm_icnt_cycle[32];
+  double icnt_sm_cycle[32];
+  double resp_cycle[32];
+  // two-dimensional array is not acceptable?
+  unsigned long l1cache_status_hit[32]; // hit
+  unsigned long l1cache_status_hrs[32]; // hit reservation
+  unsigned long l1cache_status_mis[32]; // miss
+  unsigned long l1cache_status_rsf[32]; // reservation fail
+  //JH
+  unsigned long l1cache_status_stm[32]; // sector miss
+
+  unsigned long l2cache_status_hit[32];
+  unsigned long l2cache_status_hrs[32];
+  unsigned long l2cache_status_mis[32];
+  unsigned long l2cache_status_rsf[32];
+  unsigned long l2cache_status_stm[32]; // sector miss
+
+  //unsigned long l1cache_status[32][4];
+  //unsigned long l2cache_status[32][4];
+  // function initialization
+  void init() {
+    for (unsigned i=0; i < 32; i++) {
+      num[i] = 0;
+      ex_cycle[i] = 0.0;
+      wb_cycle[i] = 0.0;
+      cache_cycle[i] = 0.0;
+      sm_icnt_cycle[i] = 0.0;
+      icnt_sm_cycle[i] = 0.0;
+      resp_cycle[i] = 0.0;
+      l1cache_status_hit[i] = 0;
+      l1cache_status_hrs[i] = 0;
+      l1cache_status_mis[i] = 0;
+      l1cache_status_rsf[i] = 0;
+      //JH
+      l1cache_status_stm[i] = 0;
+
+      l2cache_status_hit[i] = 0;
+      l2cache_status_hrs[i] = 0;
+      l2cache_status_mis[i] = 0;
+      l2cache_status_rsf[i] = 0;
+      //JH
+      l2cache_status_stm[i] = 0;
+
+      //for (unsigned j=0; j < 4; j++) {
+      //	l1cache_status[i][j] = 0;
+      //	l2cache_status[i][j] = 0;
+      //}
+    }
+  }
+};
+
 class thread_ctx_t {
  public:
   unsigned m_cta_id;  // hardware CTA this thread belongs
@@ -1739,7 +1855,12 @@ struct shader_core_stats_pod {
   std::map<address_type/*PC*/, unsigned/*counts*/> m_ld_det_cnt;
 #endif // PRF_LD_CNT
 
+#if (RPT_LD_TIME) // JH : for ld_time
+	std::map<address_type/*PC*/, ldtime_stat_acc> m_ldtime_stat_pc;
+#endif	// RPT_LD_TIME
   
+  FILE *fRptLdTime;	// logging timestamps of load instructions
+
   // memory access classification
   int gpgpu_n_mem_read_local;
   int gpgpu_n_mem_write_local;
@@ -1904,6 +2025,25 @@ class shader_core_stats : public shader_core_stats_pod {
     m_ld_det_cnt.clear();
     m_ld_undet_cnt.clear();
   #endif // PRF_LD_CNT
+
+  #if (RPT_LD_TIME) // JH
+    m_ldtime_stat_pc.clear();
+  #endif
+
+  #if (RPT_STDERR) // JH : file pointers are set to stderr when GPGPU-sim runs on a cluster
+    fRptLdTime = stderr;
+  #else
+    char nameRpt[255];
+    char nameRptBase[7];
+    strcpy(nameRptBase, "gpugj_");
+
+    sprintf(nameRpt, "%sLdTime.rpt", nameRptBase);
+    if (!( fRptLdTime = fopen(nameRpt, "wt") )) {
+      fprintf(stderr, "Error: Fail to open output file %s. (gunjae)\n", nameRpt);
+      exit(1);
+    }
+  #endif // RPT_STDERR
+
   }
 
   ~shader_core_stats() {
@@ -1932,6 +2072,10 @@ class shader_core_stats : public shader_core_stats_pod {
   const std::vector<std::vector<unsigned>> &get_warp_slot_issue() const {
     return m_shader_warp_slot_issue_distro;
   }
+  // JH : additional print functions
+  #if (RPT_LD_TIME)
+    void print_ld_time_bar( FILE *fp ) const;
+  #endif
 
  private:
   const shader_core_config *m_config;
@@ -2224,6 +2368,19 @@ class shader_core_ctx : public core_t {
   unsigned get_ld_cnt( unsigned wid, address_type pc ) const { return m_warp[wid]->m_ld_cnt.find(pc)->second; }
   void force_update_ld_cnt();
 #endif // PRF_LD_CNT
+
+#if (RPT_LD_TIME) // JH : manage load time information in SM (changed)
+  std::vector< std::map<address_type/*pc*/, ldtime_stat/*stat*/> > m_ldtime;
+  //std::map<unsigned/*warp_id*/, std::map<address_type/*pc*/, ldtime_stat/*stat*/> > m_ldtime;
+  // JH : update ld_time in writeback() of ldst_unit
+  void update_ld_time_wb( const warp_inst_t &inst, mem_fetch *mf );
+  void complete_ld_time( const warp_inst_t &inst );
+
+  // JH : print timestamps of memory requests per warp
+  void print_ld_time( const warp_inst_t &inst, FILE *fp );
+  cycle_stat analyze_timestamps( const unsigned long long *data, unsigned n, FILE *fp );
+  void acc_ld_time( const warp_inst_t &inst, bool f_wb );
+#endif	// RPT_LD_TIME
 
  protected:
   unsigned inactive_lanes_accesses_sfu(unsigned active_count, double latency) {
