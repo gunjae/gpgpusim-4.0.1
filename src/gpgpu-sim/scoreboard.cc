@@ -227,10 +227,13 @@ bool Scoreboard::checkCollision(unsigned wid, const class inst_t* inst) const {
   // Check for collision, get the intersection of reserved registers and
   // instruction registers
   std::set<int>::const_iterator it2;
-  for (it2 = inst_regs.begin(); it2 != inst_regs.end(); it2++)
+  for (it2 = inst_regs.begin(); it2 != inst_regs.end(); it2++){
     if (reg_table[wid].find(*it2) != reg_table[wid].end()) {
+	    // JH debug
+	    //fprintf(stdout, "fail scoreboard wid : %02d pc : %04X\n",wid, inst->pc);
       return true;
     }
+}
   return false;
 }
 

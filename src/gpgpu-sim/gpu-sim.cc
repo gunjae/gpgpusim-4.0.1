@@ -1359,6 +1359,11 @@ void gpgpu_sim::gpu_print_stat() {
   shader_print_scheduler_stat(stdout, false);
 
   m_shader_stats->print(stdout);
+
+  #if (RPT_LD_TIME) // JH
+  m_shader_stats->print_ld_time_bar( stdout/*m_shader_stats->fRptLdTime*/ );
+  #endif
+
 #ifdef GPGPUSIM_POWER_MODEL
   if (m_config.g_power_simulation_enabled) {
     m_gpgpusim_wrapper->print_power_kernel_stats(

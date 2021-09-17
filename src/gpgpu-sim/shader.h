@@ -1488,9 +1488,15 @@ class ldst_unit : public pipelined_simd_unit {
       cache_t *cache, new_addr_type address, warp_inst_t &inst,
       std::list<cache_event> &events, mem_fetch *mf,
       enum cache_request_status status);
+// JH : l1d cache access
+//  virtual mem_stage_stall_type process_cache_access_l1d(
+//      l1_cache *cache, warp_inst_t &inst,
+//      std::list<cache_event> &events, 
+//      enum cache_request_status status);
+      
   mem_stage_stall_type process_memory_access_queue(cache_t *cache,
                                                    warp_inst_t &inst);
-  mem_stage_stall_type process_memory_access_queue_l1cache(l1_cache *cache,
+  mem_stage_stall_type process_memory_access_queue_l1cache(l1_cache *cache, 
                                                            warp_inst_t &inst);
 
   const memory_config *m_memory_config;
@@ -1523,6 +1529,9 @@ class ldst_unit : public pipelined_simd_unit {
   // for debugging
   unsigned long long m_last_inst_gpu_sim_cycle;
   unsigned long long m_last_inst_gpu_tot_sim_cycle;
+
+  // JH : l1 latency config unable
+  //std::deque<mem_fetch *> sub_mf_queue;
 
   std::vector<std::deque<mem_fetch *>> l1_latency_queue;
   void L1_latency_queue_cycle();
@@ -2030,7 +2039,7 @@ class shader_core_stats : public shader_core_stats_pod {
     m_ldtime_stat_pc.clear();
   #endif
 
-  #if (RPT_STDERR) // JH : file pointers are set to stderr when GPGPU-sim runs on a cluster
+  #if RPT_STDERR // JH : file pointers are set to stderr when GPGPU-sim runs on a cluster
     fRptLdTime = stderr;
   #else
     char nameRpt[255];
@@ -2116,6 +2125,7 @@ class shader_core_mem_fetch_allocator : public mem_fetch_allocator {
         access, &inst_copy,
         access.is_write() ? WRITE_PACKET_SIZE : READ_PACKET_SIZE,
         inst.warp_id(), m_core_id, m_cluster_id, m_memory_config, cycle);
+    mf->m_undet_addr = inst.f_undet;
     return mf;
   }
 

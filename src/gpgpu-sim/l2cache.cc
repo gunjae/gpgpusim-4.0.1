@@ -553,17 +553,22 @@ void memory_sub_partition::cache_cycle(unsigned cycle) {
           assert(!read_sent);
           // L2 cache lock-up: will try again next cycle
         }
+
+	// JH : log L2 cache status
+	if (status < NUM_CACHE_REQUEST_STATUS)
+	  mf->m_l2cache_status = status; 
       }
     } else {
       // L2 is disabled or non-texture access to texture-only L2
       mf->set_status(IN_PARTITION_L2_TO_DRAM_QUEUE,
                      m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle);
       m_L2_dram_queue->push(mf);
-      m_icnt_L2_queue->pop();
+      m_icnt_L2_queue->pop(); 
     }
   }
 
   // ROP delay queue
+  // JH : if a current cycle time is larger than the read cycle, data is popped
   if (!m_rop.empty() && (cycle >= m_rop.front().ready_cycle) &&
       !m_icnt_L2_queue->full()) {
     mem_fetch *mf = m_rop.front().req;

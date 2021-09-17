@@ -122,13 +122,17 @@ class mem_fetch {
   const warp_inst_t &get_inst() { return m_inst; }
   enum mem_fetch_status get_status() const { return m_status; }
 
+  // JH : function
+ // void borrow_status_cycle( mem_fetch *src );
+  
   // JH : get status cycle (timestamps for each status)
   unsigned long long get_status_cycle( enum mem_fetch_status status ) const { return m_status_cycle[status]; }
-  unsigned long long get_status_cycle( unsigned n ) const { return (n<NUM_MEM_REQ_STAT)?m_status_cycle[n]:0; }
+//  unsigned long long get_status_cycle( unsigned n ) const { return (n<NUM_MEM_REQ_STAT)?m_status_cycle[n]:0; }
   // JH : log cache access status
   enum cache_request_status m_l1cache_status;
   enum cache_request_status m_l2cache_status;
-
+  // JH : check undeterministic load
+  bool m_undet_addr;		// true if address is undeterministic
   
   const memory_config *get_mem_config() { return m_mem_config; }
 
