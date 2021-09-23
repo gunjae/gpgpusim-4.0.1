@@ -937,7 +937,8 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 {
   unsigned num_sm = m_config->num_shader();
   fprintf(stdout, "GK_Summary, ----- LD time --------------------------------\n");
- 
+  //JH 
+  fprintf(fp, "req_num, ex+wb, ex, cache, sm->icnt, icnt->sm, resp, req_num, L1 hit, hit rsv, miss, rsv fail, str miss, L2 hit, hit rsv, miss, rsv fail, str miss\n"); 
   std::map<address_type/*pc*/, ldtime_stat_acc>::const_iterator it;
   for ( it=m_ldtime_stat_pc.begin(); it!=m_ldtime_stat_pc.end(); ++it ) {
     address_type pc = it->first;
@@ -984,9 +985,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
     m_config->gpgpu_ctx->func_sim->ptx_print_insn(pc, fp);
 
     fprintf(fp, "--------------------------------------------\n");
-
-    //JH 
-    fprintf(fp, "---------- req_num, ex+wb cycle, ex cycle, cache cycle, sm->icnt, icnt->sm, resp, req_num, L1 hit, hit rsv, miss, rsv fail, sector miss, L2 hit, hit rsv, miss, rsv fail, sector miss\n");
+ 
     // overall
     for (unsigned i=0; i < 32; i++) {
     // accumulation
@@ -1071,7 +1070,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
       //);
     }
     // overall
-    fprintf(fp, "--------- statistics per access ------------");
+    fprintf(fp, "--------- statistics per access ------------\n");
     fprintf(fp, "GK_LdTime, total, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf",
 		    (num_acc==0) ? 0.0: (ex_cycle_acc + wb_cycle_acc) / num_acc,
 		    (num_acc==0) ? 0.0: ex_cycle_acc / num_acc,
