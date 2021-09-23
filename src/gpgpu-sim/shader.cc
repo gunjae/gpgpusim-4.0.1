@@ -985,6 +985,8 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 
     fprintf(fp, "--------------------------------------------\n");
 
+    //JH 
+    fprintf(fp, "---------- req_num, ex+wb cycle, ex cycle, cache cycle, sm->icnt, icnt->sm, resp, req_num, L1 hit, hit rsv, miss, rsv fail, sector miss, L2 hit, hit rsv, miss, rsv fail, sector miss\n");
     // overall
     for (unsigned i=0; i < 32; i++) {
     // accumulation
@@ -1053,7 +1055,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 		      stat.num[i]     );
       //stat.ex_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.wb_cycle[i][num_sm] /= stat.num[i][num_sm];
-      //stat.cache_cycle[i][num_sm] /= stat.num[i][num_sm];
+      //stat.cachesudo docker run -it -d --name simsim1 --mount type=bind,source=/home/jonghyun/Desktop/gpgpusim,target=/root/workspace/run d737babaad87_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.sm_icnt_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.icnt_sm_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.resp_cycle[i][num_sm] /= stat.num[i][num_sm];
@@ -1069,6 +1071,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
       //);
     }
     // overall
+    fprintf(fp, "--------- statistics per access ------------");
     fprintf(fp, "GK_LdTime, total, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf",
 		    (num_acc==0) ? 0.0: (ex_cycle_acc + wb_cycle_acc) / num_acc,
 		    (num_acc==0) ? 0.0: ex_cycle_acc / num_acc,
