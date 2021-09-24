@@ -1054,7 +1054,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 		      stat.num[i]     );
       //stat.ex_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.wb_cycle[i][num_sm] /= stat.num[i][num_sm];
-      //stat.cachesudo docker run -it -d --name simsim1 --mount type=bind,source=/home/jonghyun/Desktop/gpgpusim,target=/root/workspace/run d737babaad87_cycle[i][num_sm] /= stat.num[i][num_sm];
+      //stat.cache_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.sm_icnt_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.icnt_sm_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.resp_cycle[i][num_sm] /= stat.num[i][num_sm];
@@ -1559,9 +1559,12 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
 // JH : set number of memory requests
   unsigned n_accesses = (*pipe_reg)->accessq_count();
   (*pipe_reg)->set_num_mem_requests( n_accesses );
+ 
+#if (PRF_LD_CNT)
   // JH : set undeterministic register data
   if ( m_scoreboard->check_undet(warp_id, *pipe_reg) )
 	(*pipe_reg)->f_undet = true;
+#endif
 
   if (next_inst->op == BARRIER_OP) {
     m_warp[warp_id]->store_info_of_last_inst_at_barrier(*pipe_reg);
@@ -1604,10 +1607,10 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
 #endif	// PRF_LD_CNT
 
 	// JH : check MSHR entries
-	(*pipe_reg)->m_num_mshr_at_issue = m_ldst_unit->get_L1D_num_mshr();
+	//(*pipe_reg)->m_num_mshr_at_issue = m_ldst_unit->get_L1D_num_mshr();
 
 	// JH : check number of memory requests by different active masks
-	unsigned n_am = active_mask.count();
+	//unsigned n_am = active_mask.count();
 	//unsigned n_accesses = (*pipe_reg)->accessq_count();
 }
 

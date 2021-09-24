@@ -86,7 +86,7 @@ void Scoreboard::releaseRegister(unsigned wid, unsigned regnum) {
                  regnum);
   reg_table[wid].erase(regnum);
 
-  // JH
+  // JH : bugfix
   longopregs[wid].erase(regnum);
 }
 
@@ -118,7 +118,7 @@ void Scoreboard::reserveRegisters(const class warp_inst_t* inst) {
       }
     }
   }
-  
+#if (PRF_LD_CNT) 
   // JH : collect input registers
   std::set<int> in_regs;
 
@@ -188,7 +188,7 @@ void Scoreboard::reserveRegisters(const class warp_inst_t* inst) {
 			det_regs[ inst->warp_id() ].insert( inst->out[r] );
 	}
   }
-
+  #endif // PRF_LD_CNT
 }
 
 // Release registers for an instruction
@@ -198,7 +198,7 @@ void Scoreboard::releaseRegisters(const class warp_inst_t* inst) {
       SHADER_DPRINTF(SCOREBOARD, "Register Released - warp:%d, reg: %d\n",
                      inst->warp_id(), inst->out[r]);
       releaseRegister(inst->warp_id(), inst->out[r]);
-      longopregs[inst->warp_id()].erase(inst->out[r]);// bug??
+      //longopregs[inst->warp_id()].erase(inst->out[r]);// JH : bugfix
     }
   }
 }
@@ -240,7 +240,7 @@ bool Scoreboard::checkCollision(unsigned wid, const class inst_t* inst) const {
 bool Scoreboard::pendingWrites(unsigned wid) const {
   return !reg_table[wid].empty();
 }
-
+#if (PRF_LD_CNT)
 // JH ---------------------------
 bool Scoreboard::is_undet ( unsigned warp_id, unsigned regnum ) const {
 	return undet_regs[warp_id].find(regnum) != undet_regs[warp_id].end();
@@ -329,4 +329,4 @@ void Scoreboard::print_max_reg_id( FILE *fp ) const
 {
 	fprintf(fp, "GK: Max register id for S(%02d) = %2d\n", m_sid, m_max_reg_id);
 }
-
+#endif // PRF_LD_CNT

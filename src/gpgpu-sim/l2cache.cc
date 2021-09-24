@@ -555,8 +555,8 @@ void memory_sub_partition::cache_cycle(unsigned cycle) {
         }
 
 	// JH : log L2 cache status
-	if (status < NUM_CACHE_REQUEST_STATUS)
-	  mf->m_l2cache_status = status; 
+//	if (status < NUM_CACHE_REQUEST_STATUS)
+//	  mf->m_l2cache_status = status; 
       }
     } else {
       // L2 is disabled or non-texture access to texture-only L2
