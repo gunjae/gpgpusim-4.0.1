@@ -1308,9 +1308,9 @@ void shader_core_ctx::decode() {
     // decode 1 or 2 instructions and place them into ibuffer
     address_type pc = m_inst_fetch_buffer.m_pc;
     const warp_inst_t *pI1 = get_next_inst(m_inst_fetch_buffer.m_warp_id, pc);
-    m_warp[m_inst_fetch_buffer.m_warp_id]->ibuffer_fill(0, pI1);
-    m_warp[m_inst_fetch_buffer.m_warp_id]->inc_inst_in_pipeline();
-    if (pI1) {
+    m_warp[m_inst_fetch_buffer.m_warp_id]->ibuffer_fill(0, pI1); // fill I-Buffer slot 0 with pI1 instruction and set valid bit
+    m_warp[m_inst_fetch_buffer.m_warp_id]->inc_inst_in_pipeline();// increment number of instructions in pipeline. 
+    if (pI1) { // if you success fetch next instruction, check instruction whether integer type or floating point type
       m_stats->m_num_decoded_insn[m_sid]++;
       if (pI1->oprnd_type == INT_OP) {
         m_stats->m_num_INTdecoded_insn[m_sid]++;
@@ -1318,7 +1318,7 @@ void shader_core_ctx::decode() {
         m_stats->m_num_FPdecoded_insn[m_sid]++;
       }
       const warp_inst_t *pI2 =
-          get_next_inst(m_inst_fetch_buffer.m_warp_id, pc + pI1->isize);
+          get_next_inst(m_inst_fetch_buffer.m_warp_id, pc + pI1->isize); // It can decode upto two instructions per cycle. 
       if (pI2) {
         m_warp[m_inst_fetch_buffer.m_warp_id]->ibuffer_fill(1, pI2);
         m_warp[m_inst_fetch_buffer.m_warp_id]->inc_inst_in_pipeline();
@@ -1330,7 +1330,7 @@ void shader_core_ctx::decode() {
         }
       }
     }
-    m_inst_fetch_buffer.m_valid = false;
+    m_inst_fetch_buffer.m_valid = false;  // after decode, unset valid bit in inst_fetch_buffer(not I-Buffer yet)
   }
 }
 
@@ -1618,11 +1618,11 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
 void shader_core_ctx::issue() {
   // Ensure fair round robin issu between schedulers
   unsigned j;
-  for (unsigned i = 0; i < schedulers.size(); i++) {
+  for (unsigned i = 0; i < schedulers.size(); i++) { // issue instructions upto number of schedulers in a cycle
     j = (Issue_Prio + i) % schedulers.size();
     schedulers[j]->cycle();
   }
-  Issue_Prio = (Issue_Prio + 1) % schedulers.size();
+  Issue_Prio = (Issue_Prio + 1) % schedulers.size(); // update issue priority
 
   // really is issue;
   // for (unsigned i = 0; i < schedulers.size(); i++) {
