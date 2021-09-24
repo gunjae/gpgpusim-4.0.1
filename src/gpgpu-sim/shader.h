@@ -1807,7 +1807,7 @@ struct shader_core_stats_pod {
 // JH : DP, INTP, special committed
   unsigned *m_num_int_committed;
   unsigned *m_num_dp_committed;
-  unsigned *m_num_spec_committed;
+//  unsigned *m_num_spec_committed;
 
   unsigned *m_read_regfile_acesses;
   unsigned *m_write_regfile_acesses;
@@ -1852,7 +1852,7 @@ struct shader_core_stats_pod {
   unsigned long long *m_idle_int;
   unsigned long long *m_idle_tensor_core;
   	
-  unsigned long long **m_idle_spec;
+//  unsigned long long **m_idle_spec;
 #endif // PRF_IDLE_PIPE
 
 #if (PRF_LD_CNT) // JH : count load instrutions by PC
@@ -1973,14 +1973,14 @@ class shader_core_stats : public shader_core_stats_pod {
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
     m_num_dp_committed =
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
-    m_num_spec_committed =
-        (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
+//    m_num_spec_committed =
+//        (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
 
 /*    for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
                 m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
 
-    }*/
-
+    }
+*/
 
     m_read_regfile_acesses =
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
@@ -2021,10 +2021,11 @@ class shader_core_stats : public shader_core_stats_pod {
     m_idle_int = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
     m_idle_tensor_core = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
 	
-    m_idle_spec = (unsigned long long **) calloc(config->num_shader(), sizeof(unsigned long long));
+/*    m_idle_spec = (unsigned long long **) calloc(config->num_shader(), sizeof(unsigned long long));
     for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
       m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
-    }
+    }*/ 
+    // bug??
   #endif // PRF_IDLE_PIPE
 
   #if (PRF_LD_CNT) // JH

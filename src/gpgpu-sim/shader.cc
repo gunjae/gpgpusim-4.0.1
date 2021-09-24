@@ -744,7 +744,7 @@ void shader_core_stats::print(FILE *fout) const {
 
     fprintf(fout, "GK: IDLE[%02u](%9lld, %9lld, %9lld, %9lld, %9lld, %9lld) / %9lld", i, m_idle_sp[i], m_idle_sfu[i], m_idle_mem[i], m_idle_dp[i], m_idle_int[i], m_idle_tensor_core[i], shader_cycles[i]);
     fprintf(fout, " = (%1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf)\n", ratio[0], ratio[1], ratio[2], ratio[3], ratio[4], ratio[5]);
-  	if (m_config->m_specialized_unit.size() ) {
+  /*	if (m_config->m_specialized_unit.size() ) {
    	  fprintf(fout, "JH: SPECIALIZED IDLE[%02u]", i);
    	  for(unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
        	double spec_ratio[m_config->m_specialized_unit.size()];
@@ -753,7 +753,7 @@ void shader_core_stats::print(FILE *fout) const {
    		fprintf(fout, " (%1.3lf)", spec_ratio[j]);
       }
    	fprintf(fout, "\n");
-    }
+    }*/
   }
  fprintf(fout, "GK: -------------------------------------------------------------\n");
 #endif	// PRF_IDLE_PIPE
@@ -2321,8 +2321,8 @@ void shader_core_ctx::warp_inst_complete(const warp_inst_t &inst) {
     m_stats->m_num_dp_committed[m_sid]++;
   else if (inst.op_pipe == INTP__OP)
     m_stats->m_num_int_committed[m_sid]++;
-  else if (inst.op_pipe == SPECIALIZED__OP)
-    m_stats->m_num_spec_committed[m_sid]++;
+//  else if (inst.op_pipe == SPECIALIZED__OP)
+//    m_stats->m_num_spec_committed[m_sid]++;
 
   if (m_config->gpgpu_clock_gated_lanes == false)
     m_stats->m_num_sim_insn[m_sid] += m_config->warp_size;
@@ -4236,10 +4236,10 @@ void shader_core_ctx::cycle() {
     m_stats->m_idle_int[m_sid]++;
   if (m_pipeline_reg[ID_OC_TENSOR_CORE].has_free())
     m_stats->m_idle_tensor_core[m_sid]++;
-  for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
-    if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
-    m_stats->m_idle_spec[j][m_sid]++;
-  }
+//  for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
+//    if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
+//    m_stats->m_idle_spec[j][m_sid]++;
+//  }
 #endif	// PRF_IDLE_PIPE
 }
 
