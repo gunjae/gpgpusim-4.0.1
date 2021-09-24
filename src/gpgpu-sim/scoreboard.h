@@ -50,7 +50,7 @@ class Scoreboard {
   void printContents() const;
   const bool islongop(unsigned warp_id, unsigned regnum);
 
-  // JH
+  #if (PRF_LD_CNT) // JH
   bool is_undet(unsigned warp_id, unsigned regnum) const;
   bool is_det(unsigned warp_id, unsigned regnum) const;
 
@@ -60,7 +60,8 @@ class Scoreboard {
   void print_max_reg_id( FILE *fp ) const;
   void print_undet_regs( FILE *fp ) const;
   void print_det_regs( FILE *fp ) const;
-	
+  #endif // PRF_LD_CNT
+
   // JH : index of deterministic / undeterministic registers
   std::vector< std::set<unsigned> > det_regs;
   std::vector< std::set<unsigned> > undet_regs;
