@@ -2025,7 +2025,7 @@ class shader_core_stats : public shader_core_stats_pod {
     for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
       m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
     }*/ 
-    // bug??
+    // bug fix??
   #endif // PRF_IDLE_PIPE
 
   #if (PRF_LD_CNT) // JH
