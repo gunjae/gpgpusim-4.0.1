@@ -81,7 +81,6 @@ void exec_shader_core_ctx::create_shd_warp() {
     m_warp[k] = new shd_warp_t(this, m_config->warp_size);
   }
 }
-
 void shader_core_ctx::create_front_pipeline() {
   // pipeline_stages is the sum of normal pipeline stages and specialized_unit
   // stages * 2 (for ID and EX)
@@ -237,7 +236,7 @@ void shader_core_ctx::create_schedulers() {
     schedulers[i]->done_adding_supervised_warps();
   }
 }
-
+//ID(Instruction Decode), OC(Operand Collect), EX(Execution)
 void shader_core_ctx::create_exec_pipeline() {
   // op collector configuration
   enum { SP_CUS, DP_CUS, SFU_CUS, TENSOR_CORE_CUS, INT_CUS, MEM_CUS, GEN_CUS };
@@ -246,7 +245,7 @@ void shader_core_ctx::create_exec_pipeline() {
   opndcoll_rfu_t::port_vector_t out_ports;
   opndcoll_rfu_t::uint_vector_t cu_sets;
 
-  // configure generic collectors
+  // configure generic collectors 
   m_operand_collector.add_cu_set(
       GEN_CUS, m_config->gpgpu_operand_collector_num_units_gen,
       m_config->gpgpu_operand_collector_num_out_ports_gen);
@@ -744,7 +743,7 @@ void shader_core_stats::print(FILE *fout) const {
 
     fprintf(fout, "GK: IDLE[%02u](%9lld, %9lld, %9lld, %9lld, %9lld, %9lld) / %9lld", i, m_idle_sp[i], m_idle_sfu[i], m_idle_mem[i], m_idle_dp[i], m_idle_int[i], m_idle_tensor_core[i], shader_cycles[i]);
     fprintf(fout, " = (%1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf)\n", ratio[0], ratio[1], ratio[2], ratio[3], ratio[4], ratio[5]);
-  	if (m_config->m_specialized_unit.size() ) {
+  /*	if (m_config->m_specialized_unit.size() ) {
    	  fprintf(fout, "JH: SPECIALIZED IDLE[%02u]", i);
    	  for(unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
        	double spec_ratio[m_config->m_specialized_unit.size()];
@@ -753,7 +752,7 @@ void shader_core_stats::print(FILE *fout) const {
    		fprintf(fout, " (%1.3lf)", spec_ratio[j]);
       }
    	fprintf(fout, "\n");
-    }
+    }*/
   }
  fprintf(fout, "GK: -------------------------------------------------------------\n");
 #endif	// PRF_IDLE_PIPE
@@ -1054,7 +1053,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 		      stat.num[i]     );
       //stat.ex_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.wb_cycle[i][num_sm] /= stat.num[i][num_sm];
-      //stat.cachesudo docker run -it -d --name simsim1 --mount type=bind,source=/home/jonghyun/Desktop/gpgpusim,target=/root/workspace/run d737babaad87_cycle[i][num_sm] /= stat.num[i][num_sm];
+      //stat.cache_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.sm_icnt_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.icnt_sm_cycle[i][num_sm] /= stat.num[i][num_sm];
       //stat.resp_cycle[i][num_sm] /= stat.num[i][num_sm];
@@ -1336,37 +1335,39 @@ void shader_core_ctx::decode() {
 }
 
 void shader_core_ctx::fetch() {
+  // The valid bit of an entry indicates that there is a non-issued decoded instruction within this entry in the I-Buffer.
+  // So a warp is eligible for instruction fetch if it does not have any valid instructions within I-Buffer.
   if (!m_inst_fetch_buffer.m_valid) {
-    if (m_L1I->access_ready()) {
-      mem_fetch *mf = m_L1I->next_access();
-      m_warp[mf->get_wid()]->clear_imiss_pending();
+    if (m_L1I->access_ready()) { //finished filling block into the instruction cache
+      mem_fetch *mf = m_L1I->next_access(); // access next instructions of this warp.
+      m_warp[mf->get_wid()]->clear_imiss_pending(); // clear pending by miss of this warp.
       m_inst_fetch_buffer =
           ifetch_buffer_t(m_warp[mf->get_wid()]->get_pc(),
-                          mf->get_access_size(), mf->get_wid());
+                          mf->get_access_size(), mf->get_wid()); // fetch instruction with warp id
       assert(m_warp[mf->get_wid()]->get_pc() ==
              (mf->get_addr() -
               PROGRAM_MEM_START));  // Verify that we got the instruction we
                                     // were expecting.
-      m_inst_fetch_buffer.m_valid = true;
+      m_inst_fetch_buffer.m_valid = true; // valid bit is active until fetched instruction is issued. 
       m_warp[mf->get_wid()]->set_last_fetch(m_gpu->gpu_sim_cycle);
       delete mf;
-    } else {
+    } else { // if the current warp is not ready, find warp by round-robin
       // find an active warp with space in instruction buffer that is not
       // already waiting on a cache miss and get next 1-2 instructions from
       // i-cache...
-      for (unsigned i = 0; i < m_config->max_warps_per_shader; i++) {
+      for (unsigned i = 0; i < m_config->max_warps_per_shader; i++) { // loop warps in the core. 
         unsigned warp_id =
             (m_last_warp_fetched + 1 + i) % m_config->max_warps_per_shader;
 
         // this code checks if this warp has finished executing and can be
         // reclaimed
-        if (m_warp[warp_id]->hardware_done() &&
+        if (m_warp[warp_id]->hardware_done() && //  if done, not pending writes, not exit. -> idle
             !m_scoreboard->pendingWrites(warp_id) &&
             !m_warp[warp_id]->done_exit()) {
           bool did_exit = false;
-          for (unsigned t = 0; t < m_config->warp_size; t++) {
-            unsigned tid = warp_id * m_config->warp_size + t;
-            if (m_threadState[tid].m_active == true) {
+          for (unsigned t = 0; t < m_config->warp_size; t++) { // loop threads
+            unsigned tid = warp_id * m_config->warp_size + t; //distinguish threads within warps in the core
+            if (m_threadState[tid].m_active == true) { // make threads in the warp inactive
               m_threadState[tid].m_active = false;
               unsigned cta_id = m_warp[warp_id]->get_cta_id();
               if (m_thread[tid] == NULL) {
@@ -1388,12 +1389,12 @@ void shader_core_ctx::fetch() {
 	  }
           --m_active_warps;
           assert(m_active_warps >= 0);
-        }
+        } //check finished warps and make them exit
 
         // this code fetches instructions from the i-cache or generates memory
         if (!m_warp[warp_id]->functional_done() &&
             !m_warp[warp_id]->imiss_pending() &&
-            m_warp[warp_id]->ibuffer_empty()) {
+            m_warp[warp_id]->ibuffer_empty()){ // warp is not done, not pending, empty I-Buffer
           address_type pc;
           pc = m_warp[warp_id]->get_pc();
           address_type ppc = pc + PROGRAM_MEM_START;
@@ -1559,9 +1560,12 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
 // JH : set number of memory requests
   unsigned n_accesses = (*pipe_reg)->accessq_count();
   (*pipe_reg)->set_num_mem_requests( n_accesses );
+ 
+#if (PRF_LD_CNT)
   // JH : set undeterministic register data
   if ( m_scoreboard->check_undet(warp_id, *pipe_reg) )
 	(*pipe_reg)->f_undet = true;
+#endif
 
   if (next_inst->op == BARRIER_OP) {
     m_warp[warp_id]->store_info_of_last_inst_at_barrier(*pipe_reg);
@@ -1604,10 +1608,10 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
 #endif	// PRF_LD_CNT
 
 	// JH : check MSHR entries
-	(*pipe_reg)->m_num_mshr_at_issue = m_ldst_unit->get_L1D_num_mshr();
+	//(*pipe_reg)->m_num_mshr_at_issue = m_ldst_unit->get_L1D_num_mshr();
 
 	// JH : check number of memory requests by different active masks
-	unsigned n_am = active_mask.count();
+	//unsigned n_am = active_mask.count();
 	//unsigned n_accesses = (*pipe_reg)->accessq_count();
 }
 
@@ -2318,8 +2322,8 @@ void shader_core_ctx::warp_inst_complete(const warp_inst_t &inst) {
     m_stats->m_num_dp_committed[m_sid]++;
   else if (inst.op_pipe == INTP__OP)
     m_stats->m_num_int_committed[m_sid]++;
-  else if (inst.op_pipe == SPECIALIZED__OP)
-    m_stats->m_num_spec_committed[m_sid]++;
+//  else if (inst.op_pipe == SPECIALIZED__OP)
+//    m_stats->m_num_spec_committed[m_sid]++;
 
   if (m_config->gpgpu_clock_gated_lanes == false)
     m_stats->m_num_sim_insn[m_sid] += m_config->warp_size;
@@ -4233,10 +4237,10 @@ void shader_core_ctx::cycle() {
     m_stats->m_idle_int[m_sid]++;
   if (m_pipeline_reg[ID_OC_TENSOR_CORE].has_free())
     m_stats->m_idle_tensor_core[m_sid]++;
-  for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
-    if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
-    m_stats->m_idle_spec[j][m_sid]++;
-  }
+//  for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
+//    if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
+//    m_stats->m_idle_spec[j][m_sid]++;
+//  }
 #endif	// PRF_IDLE_PIPE
 }
 
