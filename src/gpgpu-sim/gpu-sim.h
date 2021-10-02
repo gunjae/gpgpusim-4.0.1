@@ -62,6 +62,11 @@
 #define SAMPLELOG 222
 #define DUMPLOG 333
 
+
+// JH : mf cycle
+extern unsigned long long  mf_sim_cycle;
+extern unsigned long long  mf_tot_sim_cycle;
+
 class gpgpu_context;
 
 extern tr1_hash_map<new_addr_type, unsigned> address_random_interleaving;

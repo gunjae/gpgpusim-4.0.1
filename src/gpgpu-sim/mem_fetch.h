@@ -51,6 +51,7 @@ enum mf_type {
 #undef MF_TUP
 #undef MF_TUP_END
 
+
 class memory_config;
 class mem_fetch {
  public:
@@ -123,11 +124,11 @@ class mem_fetch {
   enum mem_fetch_status get_status() const { return m_status; }
 
   // JH : function
- // void borrow_status_cycle( mem_fetch *src );
+  void borrow_status_cycle( mem_fetch *src );
   
   // JH : get status cycle (timestamps for each status)
   unsigned long long get_status_cycle( enum mem_fetch_status status ) const { return m_status_cycle[status]; }
-//  unsigned long long get_status_cycle( unsigned n ) const { return (n<NUM_MEM_REQ_STAT)?m_status_cycle[n]:0; }
+  unsigned long long get_status_cycle( unsigned n ) const { return (n<NUM_MEM_REQ_STAT)?m_status_cycle[n]:0; }
   // JH : log cache access status
   enum cache_request_status m_l1cache_status;
   enum cache_request_status m_l2cache_status;
