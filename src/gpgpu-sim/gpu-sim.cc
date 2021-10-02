@@ -96,6 +96,10 @@ tr1_hash_map<new_addr_type, unsigned> address_random_interleaving;
 
 #include "mem_latency_stat.h"
 
+// JH : mf cycle
+unsigned long long  mf_sim_cycle = 0;
+unsigned long long  mf_tot_sim_cycle = 0;
+
 void power_config::reg_options(class OptionParser *opp) {
   option_parser_register(opp, "-gpuwattch_xml_file", OPT_CSTR,
                          &g_power_config_name, "GPUWattch XML file",
@@ -1032,6 +1036,10 @@ bool gpgpu_sim::active() {
 void gpgpu_sim::init() {
   // run a CUDA grid on the GPU microarchitecture simulator
   gpu_sim_cycle = 0;
+
+  //JH : mf cycle
+  mf_sim_cycle = 0;
+
   gpu_sim_insn = 0;
   last_gpu_sim_insn = 0;
   m_total_cta_launched = 0;
@@ -1079,6 +1087,9 @@ void gpgpu_sim::init() {
 void gpgpu_sim::update_stats() {
   m_memory_stats->memlatstat_lat_pw();
   gpu_tot_sim_cycle += gpu_sim_cycle;
+  // JH : mf cycle
+  mf_tot_sim_cycle = gpu_tot_sim_cycle;
+
   gpu_tot_sim_insn += gpu_sim_insn;
   gpu_tot_issued_cta += m_total_cta_launched;
   partiton_reqs_in_parallel_total += partiton_reqs_in_parallel;
@@ -1088,6 +1099,9 @@ void gpgpu_sim::update_stats() {
   gpu_tot_occupancy += gpu_occupancy;
 
   gpu_sim_cycle = 0;
+  // JH : mf cycle
+  //mf_sim_cycle = 0;
+
   partiton_reqs_in_parallel = 0;
   partiton_replys_in_parallel = 0;
   partiton_reqs_in_parallel_util = 0;
@@ -1907,6 +1921,8 @@ void gpgpu_sim::cycle() {
       raise(SIGTRAP);  // Debug breakpoint
     }
     gpu_sim_cycle++;
+    // JH : mf cycle
+    mf_sim_cycle++;
 
     if (g_interactive_debugger_enabled) gpgpu_debug();
 

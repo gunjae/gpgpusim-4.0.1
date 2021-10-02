@@ -64,6 +64,9 @@ mem_fetch::mem_fetch(const mem_access_t &access, const warp_inst_t *inst,
   m_mem_config = config;
   icnt_flit_size = config->icnt_flit_size;
 
+  // JH
+  assert((mf_tot_sim_cycle + mf_sim_cycle)==cycle);
+
 // JH
   m_l1cache_status = NUM_CACHE_REQUEST_STATUS;
   m_l2cache_status = NUM_CACHE_REQUEST_STATUS;
@@ -83,7 +86,7 @@ mem_fetch::mem_fetch(const mem_access_t &access, const warp_inst_t *inst,
 
 mem_fetch::~mem_fetch() { m_status = MEM_FETCH_DELETED;
 			// JH
-		//	m_status_cycle[ MEM_FETCH_INITIALIZED ] = cycle;	
+			m_status_cycle[ MEM_FETCH_INITIALIZED ] = mf_sim_cycle + mf_tot_sim_cycle;	
 }
 
 #define MF_TUP_BEGIN(X) static const char *Status_str[] = {
@@ -119,11 +122,11 @@ void mem_fetch::set_status(enum mem_fetch_status status,
   m_status = status;
   m_status_change = cycle;
   // JH
-  //m_status_cycle[ status ] = cycle;
+  m_status_cycle[ status ] = cycle;
 }
 
 // JH : function to borrow status_cycle information from other mem_fetch
-/*void mem_fetch::borrow_status_cycle( mem_fetch *src )
+void mem_fetch::borrow_status_cycle( mem_fetch *src )
 {
 	// from 1, [0] is set when mem_fetch is newly generated
 	for (unsigned i=1; i < NUM_MEM_REQ_STAT; i++) {
@@ -135,7 +138,7 @@ void mem_fetch::set_status(enum mem_fetch_status status,
 		this->m_l1cache_status = src->m_l1cache_status;
 	if (this->m_l2cache_status==NUM_CACHE_REQUEST_STATUS)
 		this->m_l2cache_status = src->m_l2cache_status;
-}*/
+}
 
 bool mem_fetch::isatomic() const {
   if (m_inst.empty()) return false;
