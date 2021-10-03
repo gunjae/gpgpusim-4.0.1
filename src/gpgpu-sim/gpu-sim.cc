@@ -1376,7 +1376,10 @@ void gpgpu_sim::gpu_print_stat() {
 
   #if (RPT_LD_TIME) // JH
   m_shader_stats->print_ld_time_bar( stdout/*m_shader_stats->fRptLdTime*/ );
-  #endif
+  //#endif
+  
+  m_shader_stats->print_addr_list( stdout );
+#endif
 
 #ifdef GPGPUSIM_POWER_MODEL
   if (m_config.g_power_simulation_enabled) {
