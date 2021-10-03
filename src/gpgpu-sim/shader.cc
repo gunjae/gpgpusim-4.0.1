@@ -945,15 +945,18 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
   unsigned temp = 0;
   fprintf(fp, "JH : load inst addr ------------------------\n");
   std::map< address_type, std::map<new_addr_type , std::vector<unsigned> > >::const_iterator it;
+  // loop by PC(load instructions)
   for ( it = Addr_list.begin(); it != Addr_list.end(); it++ ) {
     fprintf(fp, "PC =%04X\n", it->first);
     tot_acc = 0;
     mul_acc = 0;
     mul_addr = 0;
     tot_addr = it->second.size();
+    // loop by addresses within PC
     for ( auto it2 = it->second.begin(); it2 != it->second.end(); it2++ ) {
       m_count = 0;
       temp = 0;
+      // loop by SMs for collect SM distribution
       for ( auto it3 = it2->second.begin(); it3 != it2->second.end(); it3++ ) {
         fprintf(fp, "%d, ", *it3);
 	temp += *it3;
@@ -964,15 +967,15 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
       tot_acc+=temp;
       if (m_count >= 2) {
 	      mul_addr++;
-	      mul_acc = temp;
+	      mul_acc += temp;
       }
       fprintf(fp, "\nAddress = %llX\t", it2->first );
-      fprintf(fp, "total access counts of address: %d\n", temp);
+      fprintf(fp, "total access counts of an address: %d\n", temp);
     }
-    fprintf(fp, "address counts by accessing multiple SMs: %d\n", mul_addr);
-    fprintf(fp, "total access counts of address : %d\n", tot_addr);
-    fprintf(fp, "access counts for address by multiple SMs : %d\n", mul_acc);
-    fprintf(fp, "total address access of PC : %d\n", tot_acc);
+    fprintf(fp, "count for multiple address(accessed by multiple SMs): %d\n", mul_addr);
+    fprintf(fp, "total count for address : %d\n", tot_addr);
+    fprintf(fp, "count for multiple access by multiple SMs : %d\n", mul_acc);
+    fprintf(fp, "total count for access of PC : %d\n", tot_acc);
   } 
 }
 #endif
