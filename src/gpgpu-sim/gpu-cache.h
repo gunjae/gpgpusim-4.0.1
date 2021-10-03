@@ -936,7 +936,22 @@ class mshr_table {
     std::list<mem_fetch *> m_list;
     bool m_has_atomic;
     mshr_entry() : m_has_atomic(false) {}
+
+    // JH : function to add timestamps information	
+    void mshr_sc_merge() {		
+      if (m_list.size() <= 1) return;	// no need to merge
+      // 1) select the first memory request for the corresponding address			
+      std::list<mem_fetch*>::iterator it_first = m_list.begin();		
+      // 2) borrow status_cycle data from the first memory request			
+      std::list<mem_fetch*>::iterator it_next = it_first;			
+      it_next++;	// advanced by 1 std::advance(it, 1)			
+      for (; it_next!=m_list.end(); ++it_next) {			
+        (*it_next)->borrow_status_cycle( *it_first );
+      }
+    }
   };
+  // JH -------------------------------_
+
   typedef tr1_hash_map<new_addr_type, mshr_entry> table;
   typedef tr1_hash_map<new_addr_type, mshr_entry> line_table;
   table m_data;
