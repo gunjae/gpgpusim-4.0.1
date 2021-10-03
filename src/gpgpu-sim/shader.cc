@@ -52,6 +52,10 @@
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
+#if (RPT_LD_TIME)
+        std::map< address_type/*pc*/,std::map< new_addr_type/*addr*/, std::vector<unsigned/*sid*/>  > > Addr_list;
+#endif
+
 
 mem_fetch *shader_core_mem_fetch_allocator::alloc(
     new_addr_type addr, mem_access_type type, unsigned size, bool wr,
@@ -743,7 +747,7 @@ void shader_core_stats::print(FILE *fout) const {
 
     fprintf(fout, "GK: IDLE[%02u](%9lld, %9lld, %9lld, %9lld, %9lld, %9lld) / %9lld", i, m_idle_sp[i], m_idle_sfu[i], m_idle_mem[i], m_idle_dp[i], m_idle_int[i], m_idle_tensor_core[i], shader_cycles[i]);
     fprintf(fout, " = (%1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf, %1.3lf)\n", ratio[0], ratio[1], ratio[2], ratio[3], ratio[4], ratio[5]);
-  	if (m_config->m_specialized_unit.size() ) {
+  /*	if (m_config->m_specialized_unit.size() ) {
    	  fprintf(fout, "JH: SPECIALIZED IDLE[%02u]", i);
    	  for(unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
        	double spec_ratio[m_config->m_specialized_unit.size()];
@@ -752,7 +756,7 @@ void shader_core_stats::print(FILE *fout) const {
    		fprintf(fout, " (%1.3lf)", spec_ratio[j]);
       }
    	fprintf(fout, "\n");
-    }
+    }*/
   }
  fprintf(fout, "GK: -------------------------------------------------------------\n");
 #endif	// PRF_IDLE_PIPE
@@ -930,6 +934,48 @@ const active_mask_t &exec_shader_core_ctx::get_active_mask(
     unsigned warp_id, const warp_inst_t *pI) {
   return m_simt_stack[warp_id]->get_active_mask();
 }
+#if (RPT_LD_TIME)
+void shader_core_stats::print_addr_list( FILE *fp ) const 
+{
+  unsigned tot_addr = 0;
+  unsigned tot_acc = 0;
+  unsigned mul_addr = 0;
+  unsigned mul_acc = 0;
+  unsigned m_count = 0;
+  unsigned temp = 0;
+  fprintf(fp, "JH : load inst addr ------------------------\n");
+  std::map< address_type, std::map<new_addr_type , std::vector<unsigned> > >::const_iterator it;
+  for ( it = Addr_list.begin(); it != Addr_list.end(); it++ ) {
+    fprintf(fp, "PC =%04X\n", it->first);
+    tot_acc = 0;
+    mul_acc = 0;
+    mul_addr = 0;
+    tot_addr = it->second.size();
+    for ( auto it2 = it->second.begin(); it2 != it->second.end(); it2++ ) {
+      m_count = 0;
+      temp = 0;
+      for ( auto it3 = it2->second.begin(); it3 != it2->second.end(); it3++ ) {
+        fprintf(fp, "%d, ", *it3);
+	temp += *it3;
+	if (*it3 != 0) {
+	  m_count++;
+	}
+      }
+      tot_acc+=temp;
+      if (m_count >= 2) {
+	      mul_addr++;
+	      mul_acc = temp;
+      }
+      fprintf(fp, "\nAddress = %llX\t", it2->first );
+      fprintf(fp, "total access counts of address: %d\n", temp);
+    }
+    fprintf(fp, "address counts by accessing multiple SMs: %d\n", mul_addr);
+    fprintf(fp, "total access counts of address : %d\n", tot_addr);
+    fprintf(fp, "access counts for address by multiple SMs : %d\n", mul_acc);
+    fprintf(fp, "total address access of PC : %d\n", tot_acc);
+  } 
+}
+#endif
 
 #if (RPT_LD_TIME) // JH : print ld_time information aligned by PC
 void shader_core_stats::print_ld_time_bar( FILE *fp ) const
@@ -942,6 +988,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
   for ( it=m_ldtime_stat_pc.begin(); it!=m_ldtime_stat_pc.end(); ++it ) {
     address_type pc = it->first;
     ldtime_stat_acc stat = it->second;
+    //new_addr_type addr = it->second.addr; // JH : addr stat
     char space_c;
     switch (stat.space) {
       case const_space:
@@ -1230,6 +1277,7 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
     id = m_stats->m_ldtime_stat_pc.find(pc);
     id->second.space = inst.space.get_type();
     id->second.f_undet = inst.f_undet;
+    //id->second.addr = it->second.addr; // JH : addr stat
     if (!f_wb) {	// Not in writeback()
       id->second.l1cache_status_hit[n_mf] += it->second.m_l1cache_status[0];
       id->second.l1cache_status_hrs[n_mf] += it->second.m_l1cache_status[1];
@@ -1302,6 +1350,9 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
   }
 }
 #endif	// RPT_LD_TIME
+
+
+
 
 void shader_core_ctx::decode() {
   if (m_inst_fetch_buffer.m_valid) {
@@ -2322,8 +2373,8 @@ void shader_core_ctx::warp_inst_complete(const warp_inst_t &inst) {
     m_stats->m_num_dp_committed[m_sid]++;
   else if (inst.op_pipe == INTP__OP)
     m_stats->m_num_int_committed[m_sid]++;
-  else if (inst.op_pipe == SPECIALIZED__OP)
-    m_stats->m_num_spec_committed[m_sid]++;
+//  else if (inst.op_pipe == SPECIALIZED__OP)
+//    m_stats->m_num_spec_committed[m_sid]++;
 
   if (m_config->gpgpu_clock_gated_lanes == false)
     m_stats->m_num_sim_insn[m_sid] += m_config->warp_size;
@@ -2427,13 +2478,14 @@ mem_stage_stall_type ldst_unit::process_cache_access(
   }
 
   // JH : log timestamps for cache accesses
-  if ( (status==HIT) || (status==MISS) || (status==HIT_RESERVED)/* || (status==SECTOR_MISS)*/ ) {
+  if ( (status==HIT) || (status==MISS) || (status==HIT_RESERVED) || (status==SECTOR_MISS) ) {
     if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )	// new entry
        	    m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat>(pc, ldtime_stat()) );
     if ( m_core->m_ldtime[wid][pc].m_num_cache < 32) {  
 	    m_core->m_ldtime[wid][pc].m_cache_cycle[ m_core->m_ldtime[wid][pc].m_num_cache ] 
 		// JH : gpu_sim_cycle, gpu_tot_sim_cycle
-		    = m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
+		//    = m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;	
+		    = mf_sim_cycle + mf_tot_sim_cycle;
 	    m_core->m_ldtime[wid][pc].m_num_cache++;
     }
   }
@@ -2572,7 +2624,37 @@ void ldst_unit::L1_latency_queue_cycle() {
       // JH
       unsigned wid = mf_next->get_wid();
       address_type pc = mf_next->get_pc();
+      //new_addr_type addr = mf_next->get_addr(); // JH : addr stat
 
+      // JH : addr list
+      unsigned sid = mf_next->get_sid();
+      new_addr_type addr = mf_next->get_addr();
+#if (RPT_LD_TIME)
+      const warp_inst_t load_check = mf_next->get_inst();
+      if (load_check.is_load()) {
+        if (Addr_list.find(pc) != Addr_list.end()) { // pc exist
+		if (Addr_list[pc].find(addr) == Addr_list[pc].end()) { // addr don't exist
+			std::vector<unsigned> new_sid;
+			new_sid.assign(30,0);
+			new_sid[sid]++;
+			Addr_list[pc].insert(std::pair<new_addr_type, std::vector<unsigned> >(addr, new_sid)); // new addr entry
+			
+		} else {
+			Addr_list[pc][addr][sid]++;
+		}
+
+	} else { // new pc entry
+		std::vector<unsigned> new_sid;
+		new_sid.assign(30,0);
+		new_sid[sid]++;
+		std::map<new_addr_type, std::vector< unsigned> > new_addr;
+		new_addr.insert(std::pair<new_addr_type, std::vector<unsigned> >(addr, new_sid));
+		Addr_list.insert(std::pair<address_type, std::map<new_addr_type, std::vector<unsigned> > >(pc, new_addr));	
+	}
+      
+      }
+
+#endif
       std::list<cache_event> events;
       enum cache_request_status status =
           m_L1D->access(mf_next->get_addr(), mf_next,
@@ -2588,21 +2670,24 @@ void ldst_unit::L1_latency_queue_cycle() {
 	}
 
       // JH : log timestamps for cache accesses + added sector miss	
-      if ( (status==HIT) || (status==MISS) || (status==HIT_RESERVED)/* || (status==SECTOR_MISS)*/ ) {
+      if ( (status==HIT) || (status==MISS) || (status==HIT_RESERVED) || (status==SECTOR_MISS) ) {
         if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )  // new entry
 		m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat>(pc, ldtime_stat()) );	
 	if ( m_core->m_ldtime[wid][pc].m_num_cache < 32) {
 		m_core->m_ldtime[wid][pc].m_cache_cycle[ m_core->m_ldtime[wid][pc].m_num_cache ]
                 // JH : gpu_sim_cycle, gpu_tot_sim_cycle
-			= m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
+		//	= m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
+			= mf_sim_cycle + mf_tot_sim_cycle;
 		m_core->m_ldtime[wid][pc].m_num_cache++;	
 	}	
       }	
       if ( m_core->m_ldtime[wid].find(pc) != m_core->m_ldtime[wid].end() ){	
 	       m_core->m_ldtime[wid][pc].m_ex_cycle 
 		       = m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle; 
-			//- m_config->m_L1D_config.l1_latency/* l1 queue latency*/;	
+			//- m_config->m_L1D_config.l1_latency/* l1 queue latency*/;		
+     
       }
+
       #endif // RPT_LD_TIME      
 
       bool write_sent = was_write_sent(events);
@@ -2754,7 +2839,8 @@ bool ldst_unit::memory_cycle(warp_inst_t &inst,
       	      m_core->m_ldtime[wid][pc].m_cache_cycle[ m_core->m_ldtime[wid][pc].m_num_cache ] 
 		      
 		      // JH : gpu_sim_cycle, gpu_tot_sim_cycle
-		      = m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
+		      //= m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
+		      = mf_sim_cycle + mf_tot_sim_cycle;
 
 	      m_core->m_ldtime[wid][pc].m_num_cache++;
       }
@@ -4237,10 +4323,10 @@ void shader_core_ctx::cycle() {
     m_stats->m_idle_int[m_sid]++;
   if (m_pipeline_reg[ID_OC_TENSOR_CORE].has_free())
     m_stats->m_idle_tensor_core[m_sid]++;
-  for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
-    if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
-    m_stats->m_idle_spec[j][m_sid]++;
-  }
+//  for (unsigned j = 0; j < m_config->m_specialized_unit.size(); ++j) {
+//    if(m_pipeline_reg[m_config->m_specialized_unit[j].ID_OC_SPEC_ID].has_free())
+//    m_stats->m_idle_spec[j][m_sid]++;
+//  }
 #endif	// PRF_IDLE_PIPE
 }
 

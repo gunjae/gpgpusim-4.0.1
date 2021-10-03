@@ -74,6 +74,11 @@
 
 #define WRITE_MASK_SIZE 8
 
+#if (RPT_LD_TIME)
+extern std::map< address_type/*pc*/,std::map< new_addr_type/*addr*/, std::vector<unsigned/*sid*/>  > > Addr_list;
+#endif
+
+
 class gpgpu_context;
 
 enum exec_unit_type_t {
@@ -86,7 +91,6 @@ enum exec_unit_type_t {
   TENSOR = 6,
   SPECIALIZED = 7
 };
-
 // JH : function to analyze basic statistics
 struct cycle_stat {
   cycle_stat() { avg = 0; std = 0; gap = 0; min = 0; max = 0; }
@@ -100,7 +104,6 @@ struct cycle_stat {
 // JH : data structure for load timestamps per warp
 struct ldtime_stat {
   ldtime_stat() { init(); }
-
   unsigned m_num_mf;	// number of memory requests
   // number of status after cache accesses
   // JH : added SECTOR MISS 
@@ -118,7 +121,8 @@ struct ldtime_stat {
   unsigned m_num_sm_icnt;
   unsigned m_num_icnt_sm;
   unsigned m_num_resp;
-	
+ 
+
   // function: initialization
   void init() { 
     m_num_mf = 0;
@@ -138,6 +142,9 @@ struct ldtime_stat {
     m_ex_cycle = 0;
     m_wb_cycle = 0;	
   }
+
+  // mem addr of load inst
+  //new_addr_type addr = 0;
 };
 
 // JH : data structure for analyzing ld_time
@@ -146,6 +153,7 @@ struct ldtime_stat_acc {
   ldtime_stat_acc() { init(); }
 
   enum _memory_space_t space;
+  //new_addr_type addr; // JH : addr stat
   bool f_undet;
   // 32 arrays = number of possible memory requests
   unsigned long num[32];	// global, texture, const
@@ -173,6 +181,7 @@ struct ldtime_stat_acc {
   //unsigned long l2cache_status[32][4];
   // function initialization
   void init() {
+    
     for (unsigned i=0; i < 32; i++) {
       num[i] = 0;
       ex_cycle[i] = 0.0;
@@ -1807,7 +1816,7 @@ struct shader_core_stats_pod {
 // JH : DP, INTP, special committed
   unsigned *m_num_int_committed;
   unsigned *m_num_dp_committed;
-  unsigned *m_num_spec_committed;
+//  unsigned *m_num_spec_committed;
 
   unsigned *m_read_regfile_acesses;
   unsigned *m_write_regfile_acesses;
@@ -1852,7 +1861,7 @@ struct shader_core_stats_pod {
   unsigned long long *m_idle_int;
   unsigned long long *m_idle_tensor_core;
   	
-  unsigned long long **m_idle_spec;
+//  unsigned long long **m_idle_spec;
 #endif // PRF_IDLE_PIPE
 
 #if (PRF_LD_CNT) // JH : count load instrutions by PC
@@ -1867,6 +1876,7 @@ struct shader_core_stats_pod {
 #if (RPT_LD_TIME) // JH : for ld_time
 	std::map<address_type/*PC*/, ldtime_stat_acc> m_ldtime_stat_pc;
 #endif	// RPT_LD_TIME
+
   
   FILE *fRptLdTime;	// logging timestamps of load instructions
 
@@ -1894,6 +1904,10 @@ struct shader_core_stats_pod {
 
 class shader_core_stats : public shader_core_stats_pod {
  public:
+#if (RPT_LD_TIME)
+ void print_addr_list( FILE * ) const;
+#endif
+
   shader_core_stats(const shader_core_config *config) {
     m_config = config;
     shader_core_stats_pod *pod = reinterpret_cast<shader_core_stats_pod *>(
@@ -1973,14 +1987,14 @@ class shader_core_stats : public shader_core_stats_pod {
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
     m_num_dp_committed =
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
-    m_num_spec_committed =
-        (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
+//    m_num_spec_committed =
+//        (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
 
 /*    for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
                 m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
 
-    }*/
-
+    }
+*/
 
     m_read_regfile_acesses =
         (unsigned *)calloc(config->num_shader(), sizeof(unsigned));
@@ -2021,10 +2035,11 @@ class shader_core_stats : public shader_core_stats_pod {
     m_idle_int = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
     m_idle_tensor_core = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
 	
-    m_idle_spec = (unsigned long long **) calloc(config->num_shader(), sizeof(unsigned long long));
+/*    m_idle_spec = (unsigned long long **) calloc(config->num_shader(), sizeof(unsigned long long));
     for (unsigned j = 0; j < config->m_specialized_unit.size(); ++j) {
       m_idle_spec[j] = (unsigned long long *) calloc(config->num_shader(), sizeof(unsigned long long));
-    }
+    }*/ 
+    // bug fix??
   #endif // PRF_IDLE_PIPE
 
   #if (PRF_LD_CNT) // JH
@@ -2034,6 +2049,7 @@ class shader_core_stats : public shader_core_stats_pod {
     m_ld_det_cnt.clear();
     m_ld_undet_cnt.clear();
   #endif // PRF_LD_CNT
+
 
   #if (RPT_LD_TIME) // JH
     m_ldtime_stat_pc.clear();
@@ -2084,7 +2100,8 @@ class shader_core_stats : public shader_core_stats_pod {
   // JH : additional print functions
   #if (RPT_LD_TIME)
     void print_ld_time_bar( FILE *fp ) const;
-  #endif
+ #endif
+
 
  private:
   const shader_core_config *m_config;
