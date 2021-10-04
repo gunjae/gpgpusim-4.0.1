@@ -101,13 +101,6 @@ struct cycle_stat {
   unsigned long long max;
 };
 
-// IJ : data structure for cache status of mf
-struct pc_wrap {
-  pc_wrap(struct ldtime_stat i_stat, enum cache_request_status i_status){ ldtime_stat = i_stat; status = i_status;}
-  struct ldtime_stat ldtime_stat;
-  enum cache_request_status status;
-};
-
 // JH : data structure for load timestamps per warp
 struct ldtime_stat {
   ldtime_stat() { init(); }
@@ -154,6 +147,13 @@ struct ldtime_stat {
 
   // mem addr of load inst
   //new_addr_type addr = 0;
+};
+
+// IJ : data structure for cache status of mf
+struct pc_wrap {
+  ldtime_stat* pc_ldtime_stat;
+  enum cache_request_status status;
+  pc_wrap(ldtime_stat* i_stat, enum cache_request_status i_status) : pc_ldtime_stat(i_stat), status(i_status){};
 };
 
 // JH : data structure for analyzing ld_time
@@ -223,11 +223,11 @@ struct ldtime_stat_acc {
       l2cache_status_stm[i] = 0;
 
       //IJ_start
-      l1cache_status_hit_time = 0;
-      l1cache_status_hrs_time = 0;
-      l1cache_status_mis_time = 0;
-      l1cache_status_rsf_time = 0;
-      l1cache_status_stm_time = 0;
+      l1cache_status_hit_time[i] = 0;
+      l1cache_status_hrs_time[i] = 0;
+      l1cache_status_mis_time[i] = 0;
+      l1cache_status_rsf_time[i] = 0;
+      l1cache_status_stm_time[i] = 0;
       //IJ_end
 
       //for (unsigned j=0; j < 4; j++) {
