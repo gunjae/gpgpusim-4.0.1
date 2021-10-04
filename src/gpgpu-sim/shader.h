@@ -101,6 +101,13 @@ struct cycle_stat {
   unsigned long long max;
 };
 
+// IJ : data structure for cache status of mf
+struct pc_wrap {
+  pc_wrap(struct ldtime_stat i_stat, enum cache_request_status i_status){ ldtime_stat = i_stat; status = i_status;}
+  struct ldtime_stat ldtime_stat;
+  enum cache_request_status status;
+};
+
 // JH : data structure for load timestamps per warp
 struct ldtime_stat {
   ldtime_stat() { init(); }
@@ -116,6 +123,7 @@ struct ldtime_stat {
   unsigned long long m_resp_cycle[32];
   unsigned long long m_ex_cycle;	// when cache access is done
   unsigned long long m_wb_cycle;
+  unsigned long long m_rsf_cycle;
   // number of timestamps
   unsigned m_num_cache;
   unsigned m_num_sm_icnt;
@@ -141,6 +149,7 @@ struct ldtime_stat {
     }
     m_ex_cycle = 0;
     m_wb_cycle = 0;	
+    m_rsf_cycle = 0;
   }
 
   // mem addr of load inst
@@ -163,6 +172,15 @@ struct ldtime_stat_acc {
   double sm_icnt_cycle[32];
   double icnt_sm_cycle[32];
   double resp_cycle[32];
+
+  //IJ_start
+  unsigned long long l1cache_status_hit_time[32]; 
+  unsigned long long l1cache_status_hrs_time[32]; 
+  unsigned long long l1cache_status_mis_time[32]; 
+  unsigned long long l1cache_status_rsf_time[32]; 
+  unsigned long long l1cache_status_stm_time[32];
+  //IJ_end
+
   // two-dimensional array is not acceptable?
   unsigned long l1cache_status_hit[32]; // hit
   unsigned long l1cache_status_hrs[32]; // hit reservation
@@ -203,6 +221,14 @@ struct ldtime_stat_acc {
       l2cache_status_rsf[i] = 0;
       //JH
       l2cache_status_stm[i] = 0;
+
+      //IJ_start
+      l1cache_status_hit_time = 0;
+      l1cache_status_hrs_time = 0;
+      l1cache_status_mis_time = 0;
+      l1cache_status_rsf_time = 0;
+      l1cache_status_stm_time = 0;
+      //IJ_end
 
       //for (unsigned j=0; j < 4; j++) {
       //	l1cache_status[i][j] = 0;
@@ -2397,7 +2423,8 @@ class shader_core_ctx : public core_t {
 #endif // PRF_LD_CNT
 
 #if (RPT_LD_TIME) // JH : manage load time information in SM (changed)
-  std::vector< std::map<address_type/*pc*/, ldtime_stat/*stat*/> > m_ldtime;
+  std::vector< std::map<address_type/*pc*/, pc_wrap/*stat*/> > m_ldtime;
+  // std::vector< std::map<address_type/*pc*/, rsf_time/*reservation_time*/> > m_rsftime;
   //std::map<unsigned/*warp_id*/, std::map<address_type/*pc*/, ldtime_stat/*stat*/> > m_ldtime;
   // JH : update ld_time in writeback() of ldst_unit
   void update_ld_time_wb( const warp_inst_t &inst, mem_fetch *mf );
