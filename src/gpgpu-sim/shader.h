@@ -154,6 +154,7 @@ struct pc_wrap {
   ldtime_stat pc_ldtime_stat;
   enum cache_request_status status;
   pc_wrap(ldtime_stat i_stat, enum cache_request_status i_status) : pc_ldtime_stat(i_stat), status(i_status){};
+  pc_wrap(){};
 };
 
 // JH : data structure for analyzing ld_time

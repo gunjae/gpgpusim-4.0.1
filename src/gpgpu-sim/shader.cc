@@ -2712,7 +2712,7 @@ void ldst_unit::L1_latency_queue_cycle() {
         if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )  {// new entry
         	m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(ldtime_stat(), status)) );
           if (status == RESERVATION_FAIL)
-            m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_rsf_cycle = mf_sim_cycle + mf_tot_sim_cycle
+            m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_rsf_cycle = load_check.get_issue_cycle();
         }	          
     	  m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_l1cache_status[status]++; // including reservation fail
 	    }
@@ -2884,7 +2884,7 @@ bool ldst_unit::memory_cycle(warp_inst_t &inst,
 
       #if (RPT_LD_TIME)	// JH : if L1D is bypassed, memory request is directly pushed to interconnection
       if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )	// new entry
-	      m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(&ldtime_stat(), -1)) );
+	      m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(ldtime_stat(), HIT)) );
       if ( m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache < 32 ) {	
       	      m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_cache_cycle[ m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache ] 
 		      
