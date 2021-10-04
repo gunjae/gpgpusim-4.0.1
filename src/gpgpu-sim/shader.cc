@@ -1121,16 +1121,16 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
       // IJ_start
       fprintf(fp, "GK_LdTime, %02d, %d, %d, %d, %d, %d",
 		      i+1,
-		      l1cache_status_hit_time[i],
-          l1cache_status_hrs_time[i],
-          l1cache_status_mis_time[i],
-          l1cache_status_rsf_time[i],
-          l1cache_status_stm_time[i]	);
+		      stat.l1cache_status_hit_time[i],
+          stat.l1cache_status_hrs_time[i],
+          stat.l1cache_status_mis_time[i],
+          stat.l1cache_status_rsf_time[i],
+          stat.l1cache_status_stm_time[i]	);
       // IJ_end
 
              
       // cache statistics
-      fprintf(fp, ",\t %02d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n",
+      fprintf(fp, ",\t %02lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n",
 		      i+1,  // JH : sector miss
 		      stat.l1cache_status_hit[i], stat.l1cache_status_hrs[i], stat.l1cache_status_mis[i], stat.l1cache_status_rsf[i], stat.l1cache_status_stm[i],
 		      stat.l2cache_status_hit[i], stat.l2cache_status_hrs[i], stat.l2cache_status_mis[i], stat.l2cache_status_rsf[i], stat.l2cache_status_stm[i],
@@ -1186,7 +1186,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 	      (num_acc==0) ? 0.0: sm_icnt_cycle_acc / num_acc,
 	      (num_acc==0) ? 0.0: icnt_sm_cycle_acc / num_acc,
 	      (num_acc==0) ? 0.0: resp_cycle_acc / num_acc      );
-      fprintf(stdout, ",\t %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n", // JH : sector miss
+      fprintf(stdout, ",\t %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", // JH : sector miss
 		      l1cache_status_hit_acc, l1cache_status_hrs_acc, l1cache_status_mis_acc, l1cache_status_rsf_acc, l1cache_status_stm_acc,
 		      l2cache_status_hit_acc, l2cache_status_hrs_acc, l2cache_status_mis_acc, l2cache_status_rsf_acc, l2cache_status_stm_acc,
 		      num_acc	);
@@ -1295,7 +1295,7 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
   // JH : gpu_sim_cycle, gpu_tot_sim_cycle
   unsigned long long wb_cycle = m_gpu->gpu_sim_cycle + m_gpu->gpu_tot_sim_cycle;
   unsigned long long is_cycle = inst.get_issue_cycle();
-  unsigned long long ex_cycle = it->second.pc_ldtime_stat->m_ex_cycle;
+  unsigned long long ex_cycle = it->second.pc_ldtime_stat.m_ex_cycle;
   //unsigned long long ex_cycle = inst.get_execute_cycle();
 	
   if ( (ex_cycle > 0) ) {	// at least, memory request needs to touch cache
@@ -1326,11 +1326,11 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
     id->second.f_undet = inst.f_undet;
     //id->second.addr = it->second.addr; // JH : addr stat
     if (!f_wb) {	// Not in writeback()
-      id->second.l1cache_status_hit[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[0];
-      id->second.l1cache_status_hrs[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[1];
-      id->second.l1cache_status_mis[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[2];
-      id->second.l1cache_status_rsf[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[3];
-      id->second.l1cache_status_stm[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[4]; // JH
+      id->second.l1cache_status_hit[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[0];
+      id->second.l1cache_status_hrs[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[1];
+      id->second.l1cache_status_mis[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[2];
+      id->second.l1cache_status_rsf[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[3];
+      id->second.l1cache_status_stm[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[4]; // JH
     } else {
 
       cycle_stat cache_stat;
@@ -1338,10 +1338,10 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
       cycle_stat icnt_sm_stat;
       cycle_stat resp_stat;
 
-      cache_stat = analyze_timestamps(  it->second.pc_ldtime_stat->m_cache_cycle,   it->second.pc_ldtime_stat->m_num_cache, stderr ); 
-      sm_icnt_stat = analyze_timestamps(it->second.pc_ldtime_stat->m_sm_icnt_cycle, it->second.pc_ldtime_stat->m_num_sm_icnt, stderr ); 
-      icnt_sm_stat = analyze_timestamps(it->second.pc_ldtime_stat->m_icnt_sm_cycle, it->second.pc_ldtime_stat->m_num_icnt_sm, stderr ); 
-      resp_stat = analyze_timestamps(   it->second.pc_ldtime_stat->m_resp_cycle,    it->second.pc_ldtime_stat->m_num_resp, stderr ); 
+      cache_stat = analyze_timestamps(  it->second.pc_ldtime_stat.m_cache_cycle,   it->second.pc_ldtime_stat.m_num_cache, stderr ); 
+      sm_icnt_stat = analyze_timestamps(it->second.pc_ldtime_stat.m_sm_icnt_cycle, it->second.pc_ldtime_stat.m_num_sm_icnt, stderr ); 
+      icnt_sm_stat = analyze_timestamps(it->second.pc_ldtime_stat.m_icnt_sm_cycle, it->second.pc_ldtime_stat.m_num_icnt_sm, stderr ); 
+      resp_stat = analyze_timestamps(   it->second.pc_ldtime_stat.m_resp_cycle,    it->second.pc_ldtime_stat.m_num_resp, stderr ); 
 			
       // per SM --> deleted (not working?)
 
@@ -1355,22 +1355,22 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
       id->second.icnt_sm_cycle[n_mf] += (double) icnt_sm_stat.gap;
       id->second.resp_cycle[n_mf] += (double) resp_stat.gap;
 
-      id->second.l1cache_status_hit[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[0];
-      id->second.l1cache_status_hrs[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[1];
-      id->second.l1cache_status_mis[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[2];
-      id->second.l1cache_status_rsf[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[3];
-      id->second.l1cache_status_stm[n_mf] += it->second.pc_ldtime_stat->m_l1cache_status[4];
-      id->second.l2cache_status_stm[n_mf] += it->second.pc_ldtime_stat->m_l2cache_status[4];
-      id->second.l2cache_status_hit[n_mf] += it->second.pc_ldtime_stat->m_l2cache_status[0];
-      id->second.l2cache_status_hrs[n_mf] += it->second.pc_ldtime_stat->m_l2cache_status[1];
-      id->second.l2cache_status_mis[n_mf] += it->second.pc_ldtime_stat->m_l2cache_status[2];
-      id->second.l2cache_status_rsf[n_mf] += it->second.pc_ldtime_stat->m_l2cache_status[3];
+      id->second.l1cache_status_hit[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[0];
+      id->second.l1cache_status_hrs[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[1];
+      id->second.l1cache_status_mis[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[2];
+      id->second.l1cache_status_rsf[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[3];
+      id->second.l1cache_status_stm[n_mf] += it->second.pc_ldtime_stat.m_l1cache_status[4];
+      id->second.l2cache_status_stm[n_mf] += it->second.pc_ldtime_stat.m_l2cache_status[4];
+      id->second.l2cache_status_hit[n_mf] += it->second.pc_ldtime_stat.m_l2cache_status[0];
+      id->second.l2cache_status_hrs[n_mf] += it->second.pc_ldtime_stat.m_l2cache_status[1];
+      id->second.l2cache_status_mis[n_mf] += it->second.pc_ldtime_stat.m_l2cache_status[2];
+      id->second.l2cache_status_rsf[n_mf] += it->second.pc_ldtime_stat.m_l2cache_status[3];
 
-      if     (it->second.pc_ldtime_stat->status == HIT)               id->second.l1cache_status_hit_time[n_mf] += wb_cycle - issue_time;
-      else if(it->second.pc_ldtime_stat->status == HIT_RESERVED)      id->second.l1cache_status_hrs_time[n_mf] += wb_cycle - issue_time;
-      else if(it->second.pc_ldtime_stat->status == MISS)              id->second.l1cache_status_mis_time[n_mf] += wb_cycle - issue_time;
-      else if(it->second.pc_ldtime_stat->status == RESERVATION_FAIL)  id->second.l1cache_status_rsf_time[n_mf] += it->second.pc_ldtime_stat->m_rsf_cycle;
-      else if(it->second.pc_ldtime_stat->status == SECTOR_MISS)       id->second.l1cache_status_stm_time[n_mf] += wb_cycle - issue_time;
+      if     (it->second.status == HIT)               id->second.l1cache_status_hit_time[n_mf] += wb_cycle - is_cycle;
+      else if(it->second.status == HIT_RESERVED)      id->second.l1cache_status_hrs_time[n_mf] += wb_cycle - is_cycle;
+      else if(it->second.status == MISS)              id->second.l1cache_status_mis_time[n_mf] += wb_cycle - is_cycle;
+      else if(it->second.status == RESERVATION_FAIL)  id->second.l1cache_status_rsf_time[n_mf] += it->second.pc_ldtime_stat.m_rsf_cycle;
+      else if(it->second.status == SECTOR_MISS)       id->second.l1cache_status_stm_time[n_mf] += wb_cycle - is_cycle;
 
 
       //for (unsigned i=0; i < 4; i++) {
@@ -2517,21 +2517,22 @@ mem_stage_stall_type ldst_unit::process_cache_access(
   #if (RPT_LD_TIME) // JH : log cache status
   if (status < NUM_CACHE_REQUEST_STATUS) {
     if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )	{// new entry
-      m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(&ldtime_stat(), status)) );   
+      // ldtime_stat ldtime_tmp = ldtime_stat();
+      m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(ldtime_stat(), status)) );   
     }
-    m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_l1cache_status[status]++;
+    m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_l1cache_status[status]++;
   }
 
   // JH : log timestamps for cache accesses
   if ( (status==HIT) || (status==MISS) || (status==HIT_RESERVED) || (status==SECTOR_MISS) ) {
     if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )	// new entry
-       	    m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(&ldtime_stat(), status)) );
-    if ( m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache < 32) {  
-	    m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_cache_cycle[ m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache ] 
+       	    m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(ldtime_stat(), status)) );
+    if ( m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache < 32) {  
+	    m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_cache_cycle[ m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache ] 
 		// JH : gpu_sim_cycle, gpu_tot_sim_cycle
 		//    = m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;	
 		    = mf_sim_cycle + mf_tot_sim_cycle;
-	    m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache++;
+	    m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache++;
     }
   }
   #endif // RPT_LD_TIME
@@ -2709,30 +2710,30 @@ void ldst_unit::L1_latency_queue_cycle() {
      #if (RPT_LD_TIME)	// JH + IJ
       if (status < NUM_CACHE_REQUEST_STATUS) {
         if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )  {// new entry
-        	m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(&ldtime_stat(), status)) );
+        	m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(ldtime_stat(), status)) );
           if (status == RESERVATION_FAIL)
-            m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_rsf_cycle = mf_sim_cycle + mf_tot_sim_cycle
+            m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_rsf_cycle = mf_sim_cycle + mf_tot_sim_cycle
         }	          
-    	  m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_l1cache_status[status]++; // including reservation fail
+    	  m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_l1cache_status[status]++; // including reservation fail
 	    }
 
       // JH : log timestamps for cache accesses + added sector miss	
       if ( (status==HIT) || (status==MISS) || (status==HIT_RESERVED) || (status==SECTOR_MISS) ) {
         if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )  // new entry
-		      m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(&ldtime_stat(), status)) );	
-	      if ( m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache < 32) {
-          m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_cache_cycle[ m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache ]
+		      m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(ldtime_stat(), status)) );	
+	      if ( m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache < 32) {
+          m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_cache_cycle[ m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache ]
           // JH : gpu_sim_cycle, gpu_tot_sim_cycle
           //	= m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
             = mf_sim_cycle + mf_tot_sim_cycle;
-          m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache++;	
+          m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache++;	
         }	
         if(m_core->m_ldtime[wid].find(pc) != m_core->m_ldtime[wid].end()){
-          m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_rsf_cycle = mf_sim_cycle + mf_tot_sim_cycle - m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_rsf_cycle; // update to reservation fail latency
+          m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_rsf_cycle = mf_sim_cycle + mf_tot_sim_cycle - m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_rsf_cycle; // update to reservation fail latency
         }
       }
       if ( m_core->m_ldtime[wid].find(pc) != m_core->m_ldtime[wid].end() ){	
-	       m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_ex_cycle 
+	       m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_ex_cycle 
 		       = m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle; 
 			//- m_config->m_L1D_config.l1_latency/* l1 queue latency*/;		
      
@@ -2884,14 +2885,14 @@ bool ldst_unit::memory_cycle(warp_inst_t &inst,
       #if (RPT_LD_TIME)	// JH : if L1D is bypassed, memory request is directly pushed to interconnection
       if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )	// new entry
 	      m_core->m_ldtime[wid].insert( std::pair<address_type, pc_wrap>(pc, pc_wrap(&ldtime_stat(), -1)) );
-      if ( m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache < 32 ) {	
-      	      m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_cache_cycle[ m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache ] 
+      if ( m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache < 32 ) {	
+      	      m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_cache_cycle[ m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache ] 
 		      
 		      // JH : gpu_sim_cycle, gpu_tot_sim_cycle
 		      //= m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
 		      = mf_sim_cycle + mf_tot_sim_cycle;
 
-	      m_core->m_ldtime[wid][pc].pc_ldtime_stat->m_num_cache++;
+	      m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_num_cache++;
       }
       #endif	// RPT_LD_TIME
 
@@ -2974,29 +2975,29 @@ void shader_core_ctx::update_ld_time_wb( const warp_inst_t &inst, mem_fetch *mf 
   } else {
   // icnt to mem
     unsigned num_cycle;
-    num_cycle = m_ldtime[wid][pc].pc_ldtime_stat->m_num_sm_icnt;
+    num_cycle = m_ldtime[wid][pc].pc_ldtime_stat.m_num_sm_icnt;
 
     if ( num_cycle < 32 ) {
-	    m_ldtime[wid][pc].pc_ldtime_stat->m_sm_icnt_cycle[ num_cycle ] = mf->get_status_cycle( IN_ICNT_TO_MEM );
-	    m_ldtime[wid][pc].pc_ldtime_stat->m_num_sm_icnt++;
+	    m_ldtime[wid][pc].pc_ldtime_stat.m_sm_icnt_cycle[ num_cycle ] = mf->get_status_cycle( IN_ICNT_TO_MEM );
+	    m_ldtime[wid][pc].pc_ldtime_stat.m_num_sm_icnt++;
     }
     // mem to icnt
-    num_cycle = m_ldtime[wid][pc].pc_ldtime_stat->m_num_icnt_sm;
+    num_cycle = m_ldtime[wid][pc].pc_ldtime_stat.m_num_icnt_sm;
     if ( num_cycle < 32 ) {
-	    m_ldtime[wid][pc].pc_ldtime_stat->m_icnt_sm_cycle[ num_cycle ] = mf->get_status_cycle( IN_ICNT_TO_SHADER );
-	    m_ldtime[wid][pc].pc_ldtime_stat->m_num_icnt_sm++;
+	    m_ldtime[wid][pc].pc_ldtime_stat.m_icnt_sm_cycle[ num_cycle ] = mf->get_status_cycle( IN_ICNT_TO_SHADER );
+	    m_ldtime[wid][pc].pc_ldtime_stat.m_num_icnt_sm++;
     }
 
     // response fifo
-    num_cycle = m_ldtime[wid][pc].pc_ldtime_stat->m_num_resp;
+    num_cycle = m_ldtime[wid][pc].pc_ldtime_stat.m_num_resp;
     if ( num_cycle < 32 ) {
-	    m_ldtime[wid][pc].pc_ldtime_stat->m_resp_cycle[ num_cycle ] = mf->get_status_cycle( IN_SHADER_LDST_RESPONSE_FIFO );
-	    m_ldtime[wid][pc].pc_ldtime_stat->m_num_resp++;
+	    m_ldtime[wid][pc].pc_ldtime_stat.m_resp_cycle[ num_cycle ] = mf->get_status_cycle( IN_SHADER_LDST_RESPONSE_FIFO );
+	    m_ldtime[wid][pc].pc_ldtime_stat.m_num_resp++;
     }
     // l2cache status
     enum cache_request_status status = mf->m_l2cache_status;
     if (status < NUM_CACHE_REQUEST_STATUS){
-	    m_ldtime[wid][pc].pc_ldtime_stat->m_l2cache_status[status]++;
+	    m_ldtime[wid][pc].pc_ldtime_stat.m_l2cache_status[status]++;
     }
   }
 }
