@@ -239,6 +239,20 @@ struct ldtime_stat_acc {
   }
 };
 
+struct cta_stat {
+  cta_stat() { init(); }
+  unsigned warp_array[32];
+  unsigned long long wb_cycle[32];
+  unsigned long long is_cycle[32];
+  void init(){
+    for (unsigned i = 0; i < 32; i++) {
+      warp_array[i] =0;
+      wb_cycle[i] = 0;
+      is_cycle[i] = 0;
+    }
+  }
+};
+
 class thread_ctx_t {
  public:
   unsigned m_cta_id;  // hardware CTA this thread belongs
@@ -1902,6 +1916,8 @@ struct shader_core_stats_pod {
 
 #if (RPT_LD_TIME) // JH : for ld_time
 	std::map<address_type/*PC*/, ldtime_stat_acc> m_ldtime_stat_pc;
+	// JH : cta stat
+	std::map<unsigned/*cta_id*/, cta_stat> m_cta_stat;
 #endif	// RPT_LD_TIME
 
   
@@ -2080,6 +2096,8 @@ class shader_core_stats : public shader_core_stats_pod {
 
   #if (RPT_LD_TIME) // JH
     m_ldtime_stat_pc.clear();
+    // JH : cta stat
+    m_cta_stat.clear();
   #endif
 
   #if RPT_STDERR // JH : file pointers are set to stderr when GPGPU-sim runs on a cluster
