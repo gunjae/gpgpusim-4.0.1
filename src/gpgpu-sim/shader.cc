@@ -942,9 +942,10 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
   unsigned tot_acc = 0;
   unsigned mul_addr = 0;
   unsigned mul_acc = 0;
+  unsigned sm_count = 0;
   unsigned m_count = 0;
   unsigned temp = 0;
-  fprintf(fp, "JH : load inst addr ------------------------\n");
+  fprintf(fp, "JH : load inst address stat ------------------------\n");
   std::map< address_type, std::map<new_addr_type , std::vector<unsigned> > >::const_iterator it;
   // loop by PC(load instructions)
   for ( it = Addr_list.begin(); it != Addr_list.end(); it++ ) {
@@ -955,11 +956,11 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
     tot_addr = it->second.size();
     // loop by addresses within PC
     for ( auto it2 = it->second.begin(); it2 != it->second.end(); it2++ ) {
-      m_count = 0;
       temp = 0;
+      m_count = 0;
       // loop by SMs for collect SM distribution
       for ( auto it3 = it2->second.begin(); it3 != it2->second.end(); it3++ ) {
-        fprintf(fp, "%d, ", *it3);
+        //fprintf(fp, "%d, ", *it3);
 	temp += *it3;
 	if (*it3 != 0) {
 	  m_count++;
@@ -969,14 +970,19 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
       if (m_count >= 2) {
 	      mul_addr++;
 	      mul_acc += temp;
+	      sm_count += m_count;
       }
-      fprintf(fp, "\nAddress = %llX\t", it2->first );
-      fprintf(fp, "total access counts of an address: %d\n", temp);
+      
+      //fprintf(fp, "\n");
+      //fprintf(fp, "Address = %llX\t", it2->first );
+      //fprintf(fp, "total access counts of an address: %d\n", temp);
     }
+    fprintf(fp, "SM counts of total multiple accessed address / total multiple accessed address counts = %3.3f\n",(float)sm_count/mul_addr);
     fprintf(fp, "count for multiple address(accessed by multiple SMs): %d\n", mul_addr);
     fprintf(fp, "total count for address : %d\n", tot_addr);
     fprintf(fp, "count for multiple access by multiple SMs : %d\n", mul_acc);
     fprintf(fp, "total count for access of PC : %d\n", tot_acc);
+    fprintf(fp, "----------------------------------------------\n");
   } 
 }
 #endif
@@ -986,28 +992,47 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 {
   unsigned num_sm = m_config->num_shader();
   
-//  std::map<unsigned/*cta_id*/, cta_stat>::const_iterator id;  
   // JH : cta stat
-/*  fprintf(fp, "JH ---- CTA stat --------------------------------------\n ");
+  std::map<unsigned/*cta_id*/, cta_stat>::const_iterator id;
+  unsigned long long max_cta = 0;
+  unsigned long long min_cta = 0;
+  fprintf(fp, "JH ---- CTA stat --------------------------------------\n ");
   for ( id=m_cta_stat.begin(); id!=m_cta_stat.end(); ++id ) {
     unsigned cta_id = id->first;
     cta_stat cstat = id->second;
-    fprintf(fp, "JH : CTA ID : %d %\n", cta_id);
-    fprintf(fp, "Wid:count");
-    for (unsigned i=0; i<32; ++i) {
-      fprintf(fp, "(%d:%02d),",i+1, cstat.warp_array[i]);
+    
+    //analyze cta time
+    //min_cta = cstat.wb_cycle[0];
+  /*  unsigned long long max_is = cstat.is_cycle[0];
+    unsigned long long min_is = cstat.is_cycle[0];
+    unsigned long long max_wb = cstat.wb_cycle[0];
+    unsigned long long min_wb = cstat.wb_cycle[0];
+    for (unsigned long long k = 1; k < cstat.is_cycle.size(); ++k) {
+      if (cstat.is_cycle[k] < min_is ) min_is = cstat.is_cycle[k];
+      if (cstat.is_cycle[k] > max_is ) max_is = cstat.is_cycle[k];
+      if (cstat.wb_cycle[k] < min_wb ) min_wb = cstat.wb_cycle[k];
+      if (cstat.wb_cycle[k] > max_wb ) max_wb = cstat.wb_cycle[k];
     }
-    fprintf(fp,"\n Wb : ");
-    for (unsigned i=0; i<32; ++i) {
-      fprintf(fp, "%lld, ", cstat.wb_cycle[i]);
+    unsigned long long gap_is = max_is - min_is;
+    unsigned long long gap_wb = max_wb - min_wb; 
+   */
+    unsigned long long max = cstat.wb_cycle[0] - cstat.is_cycle[0];
+    unsigned long long min = cstat.wb_cycle[0] - cstat.is_cycle[0];
+    for (unsigned long long k = 1; k < cstat.is_cycle.size(); ++k) {
+      if (min <= 0) min = cstat.wb_cycle[k] - cstat.is_cycle[k];
+      if (cstat.wb_cycle[k] - cstat.is_cycle[k] < min ) min = cstat.wb_cycle[k] - cstat.is_cycle[k];
+      if (cstat.wb_cycle[k] - cstat.is_cycle[k] > max ) max = cstat.wb_cycle[k] - cstat.is_cycle[k];
     }
-    fprintf(fp,"\n IS : ");
-    for (unsigned i=0; i<32; ++i) {
-      fprintf(fp, "%lld, ", cstat.is_cycle[i]);
-    }
-    fprintf(fp, "---------------------------------------\n");
+
+    fprintf(fp, "JH, CTA ID : %d\t", cta_id);
+    fprintf(fp, "max CTA cycle : %lld, min CTA cycle : %lld\n", max, min);
+    if (max > max_cta) max_cta = max;
+    if (min_cta <= 0) min_cta = min;
+    if (min < min_cta) min_cta = min;
   }
-*/
+  fprintf(fp, "JH_Summary, Total Max CTA cycle : %lld, Total Min CTA cycle : %lld\n", max_cta, min_cta );
+  fprintf(fp, "---------------------------------------\n");
+
   fprintf(stdout, "GK_Summary, ----- LD time --------------------------------\n");
   //JH 
   fprintf(fp, "req_num, ex+wb, ex, cache, sm->icnt, icnt->sm, resp, req_num, L1 hit, hit rsv, miss, rsv fail, str miss, L2 hit, hit rsv, miss, rsv fail, str miss\n"); 
@@ -1314,7 +1339,7 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
   dim3 warp_dim = get_kernel()->get_cta_dim();
 
   unsigned cta_id = cta_dim.x * cta_dim.y * cta_3d.z + cta_dim.x * cta_3d.y + cta_3d.x;
-  unsigned cta_wid = warp_dim.x * warp_dim.y * warp_dim.z * cta_id/32 + wid;   
+  unsigned cta_wid = (unsigned int)(warp_dim.x * warp_dim.y * warp_dim.z * cta_id/32) + wid;   
   // fprintf(stdout, "ctx id of this warp : %d\n", cta_id );  
 
   if ( m_ldtime[wid].find(pc)==m_ldtime[wid].end() ) {
@@ -1336,8 +1361,8 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
   std::map<unsigned, cta_stat>::iterator ip;
   ip = m_stats->m_cta_stat.find(cta_id);
   if (m_stats->m_cta_stat[cta_id].is_cycle.size() <= cta_wid ) {
-  	m_stats->m_cta_stat[cta_id].wb_cycle.resize(cta_wid);
-	m_stats->m_cta_stat[cta_id].is_cycle.resize(cta_wid);
+  	m_stats->m_cta_stat[cta_id].wb_cycle.resize(cta_wid+1,0);
+	m_stats->m_cta_stat[cta_id].is_cycle.resize(cta_wid+1,0);
 
   }
 //  ip->second.warp_array[cta_wid]++;

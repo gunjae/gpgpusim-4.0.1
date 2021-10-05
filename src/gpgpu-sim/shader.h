@@ -244,13 +244,16 @@ struct cta_stat {
 //	std::vector<unsigned> warp_array;
 	std::vector<unsigned long long> wb_cycle;
 	std::vector<unsigned long long> is_cycle;
- /* void init(){
-    for (unsigned i = 0; i < 32; i++) {
+
+  void init(){
+	  wb_cycle.clear();
+	  is_cycle.clear();
+    /*for (unsigned i = 0; i < 32; i++) {
       warp_array[i] =0;
       wb_cycle[i] = 0;
       is_cycle[i] = 0;
-    }
-  }*/
+    }*/
+  }
 };
 
 class thread_ctx_t {
