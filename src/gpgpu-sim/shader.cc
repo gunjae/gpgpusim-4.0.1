@@ -986,13 +986,13 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 {
   unsigned num_sm = m_config->num_shader();
   
-  std::map<unsigned/*cta_id*/, cta_stat>::const_iterator id;  
+//  std::map<unsigned/*cta_id*/, cta_stat>::const_iterator id;  
   // JH : cta stat
-  fprintf(fp, "JH ---- CTA stat --------------------------------------\n ");
+/*  fprintf(fp, "JH ---- CTA stat --------------------------------------\n ");
   for ( id=m_cta_stat.begin(); id!=m_cta_stat.end(); ++id ) {
     unsigned cta_id = id->first;
     cta_stat cstat = id->second;
-    fprintf(fp, "JH : CTA ID : %d \n", cta_id);
+    fprintf(fp, "JH : CTA ID : %d %\n", cta_id);
     fprintf(fp, "Wid:count");
     for (unsigned i=0; i<32; ++i) {
       fprintf(fp, "(%d:%02d),",i+1, cstat.warp_array[i]);
@@ -1007,7 +1007,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
     }
     fprintf(fp, "---------------------------------------\n");
   }
-
+*/
   fprintf(stdout, "GK_Summary, ----- LD time --------------------------------\n");
   //JH 
   fprintf(fp, "req_num, ex+wb, ex, cache, sm->icnt, icnt->sm, resp, req_num, L1 hit, hit rsv, miss, rsv fail, str miss, L2 hit, hit rsv, miss, rsv fail, str miss\n"); 
@@ -1309,8 +1309,13 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
   unsigned n_mf = inst.get_num_mem_requests() - 1;	// it should be more than or equal to 1
   
   // JH : ctx id call
-  unsigned cta_id = m_warp[wid]->get_cta_id();
- // fprintf(stdout, "ctx id of this warp : %d\n", cta_id );  
+  dim3 cta_3d = get_kernel()->get_next_cta_id();
+  dim3 cta_dim = get_kernel()->get_grid_dim();
+  dim3 warp_dim = get_kernel()->get_cta_dim();
+
+  unsigned cta_id = cta_dim.x * cta_dim.y * cta_3d.z + cta_dim.x * cta_3d.y + cta_3d.x;
+  unsigned cta_wid = warp_dim.x * warp_dim.y * warp_dim.z * cta_id/32 + wid;   
+  // fprintf(stdout, "ctx id of this warp : %d\n", cta_id );  
 
   if ( m_ldtime[wid].find(pc)==m_ldtime[wid].end() ) {
       //fprintf(stdout, "Entry for (%2d:%04X) is not found\n", wid, pc);  
@@ -1330,9 +1335,14 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
   }
   std::map<unsigned, cta_stat>::iterator ip;
   ip = m_stats->m_cta_stat.find(cta_id);
-  ip->second.warp_array[wid]++;
-  ip->second.wb_cycle[wid] = wb_cycle;
-  ip->second.is_cycle[wid] = is_cycle;
+  if (m_stats->m_cta_stat[cta_id].is_cycle.size() <= cta_wid ) {
+  	m_stats->m_cta_stat[cta_id].wb_cycle.resize(cta_wid);
+	m_stats->m_cta_stat[cta_id].is_cycle.resize(cta_wid);
+
+  }
+//  ip->second.warp_array[cta_wid]++;
+  ip->second.wb_cycle[cta_wid] = wb_cycle;
+  ip->second.is_cycle[cta_wid] = is_cycle;
 	
   if ( (ex_cycle > 0) ) {	// at least, memory request needs to touch cache
     unsigned num_sm = m_config->num_shader();
@@ -1342,16 +1352,6 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
       m_stats->m_ldtime_stat_pc.insert( std::pair<address_type, ldtime_stat_acc>(pc, ldtime_stat_acc()) );
       //m_stats->m_ldtime_stat_pc.insert( std::pair<address_type, ldtime_stat_acc>(pc, ldtime_stat_acc( num_sm )) );
     }
-    //JH : cta stat
-/*    if ( m_stats->m_cta_stat.find(cta_id)==m_stats->m_cta_stat.end() ) {        // not in entry
-      m_stats->m_cta_stat.insert( std::pair<unsigned, cta_stat>(cta_id, cta_stat()) );
-    }
-    std::map<unsigned, cta_stat>::iterator ip;
-    ip = m_stats->m_cta_stat.find(cta_id);
-    ip->second.warp_array[wid]++;
-    ip->second.wb_cycle[wid] = wb_cycle;
-    ip->second.is_cycle[wid] = is_cycle;
-*/
 
     //		unsigned sp;	// decoded space
     //		switch ( inst.space.get_type() ) {

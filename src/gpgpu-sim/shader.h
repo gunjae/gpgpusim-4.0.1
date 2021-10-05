@@ -240,17 +240,17 @@ struct ldtime_stat_acc {
 };
 
 struct cta_stat {
-  cta_stat() { init(); }
-  unsigned warp_array[32];
-  unsigned long long wb_cycle[32];
-  unsigned long long is_cycle[32];
-  void init(){
+ // cta_stat() { init(); }
+//	std::vector<unsigned> warp_array;
+	std::vector<unsigned long long> wb_cycle;
+	std::vector<unsigned long long> is_cycle;
+ /* void init(){
     for (unsigned i = 0; i < 32; i++) {
       warp_array[i] =0;
       wb_cycle[i] = 0;
       is_cycle[i] = 0;
     }
-  }
+  }*/
 };
 
 class thread_ctx_t {
