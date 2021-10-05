@@ -150,13 +150,13 @@ struct ldtime_stat {
 };
 
 // IJ : data structure for cache status of mf
-struct pc_wrap {
+/*struct pc_wrap {
   ldtime_stat pc_ldtime_stat;
   enum cache_request_status status;
   pc_wrap(ldtime_stat i_stat, enum cache_request_status i_status) : pc_ldtime_stat(i_stat), status(i_status){};
   pc_wrap(){};
 };
-
+*/
 // JH : data structure for analyzing ld_time
 struct ldtime_stat_acc {
 
@@ -2445,7 +2445,7 @@ class shader_core_ctx : public core_t {
 #endif // PRF_LD_CNT
 
 #if (RPT_LD_TIME) // JH : manage load time information in SM (changed)
-  std::vector< std::map<address_type/*pc*/, pc_wrap/*stat*/> > m_ldtime;
+  std::vector< std::map<address_type/*pc*/, ldtime_stat/*stat*/> > m_ldtime;
   // std::vector< std::map<address_type/*pc*/, rsf_time/*reservation_time*/> > m_rsftime;
   //std::map<unsigned/*warp_id*/, std::map<address_type/*pc*/, ldtime_stat/*stat*/> > m_ldtime;
   // JH : update ld_time in writeback() of ldst_unit
