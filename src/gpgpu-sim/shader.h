@@ -116,6 +116,7 @@ struct ldtime_stat {
   unsigned long long m_resp_cycle[32];
   unsigned long long m_ex_cycle;	// when cache access is done
   unsigned long long m_wb_cycle;
+  unsigned long long m_rsf_cycle;
   // number of timestamps
   unsigned m_num_cache;
   unsigned m_num_sm_icnt;
@@ -141,12 +142,21 @@ struct ldtime_stat {
     }
     m_ex_cycle = 0;
     m_wb_cycle = 0;	
+    m_rsf_cycle = 0;
   }
 
   // mem addr of load inst
   //new_addr_type addr = 0;
 };
 
+// IJ : data structure for cache status of mf
+/*struct pc_wrap {
+  ldtime_stat pc_ldtime_stat;
+  enum cache_request_status status;
+  pc_wrap(ldtime_stat i_stat, enum cache_request_status i_status) : pc_ldtime_stat(i_stat), status(i_status){};
+  pc_wrap(){};
+};
+*/
 // JH : data structure for analyzing ld_time
 struct ldtime_stat_acc {
 
@@ -163,6 +173,15 @@ struct ldtime_stat_acc {
   double sm_icnt_cycle[32];
   double icnt_sm_cycle[32];
   double resp_cycle[32];
+
+  //IJ_start
+  unsigned long long l1cache_status_hit_time[32]; 
+  unsigned long long l1cache_status_hrs_time[32]; 
+  unsigned long long l1cache_status_mis_time[32]; 
+  unsigned long long l1cache_status_rsf_time[32]; 
+  unsigned long long l1cache_status_stm_time[32];
+  //IJ_end
+
   // two-dimensional array is not acceptable?
   unsigned long l1cache_status_hit[32]; // hit
   unsigned long l1cache_status_hrs[32]; // hit reservation
@@ -204,11 +223,36 @@ struct ldtime_stat_acc {
       //JH
       l2cache_status_stm[i] = 0;
 
+      //IJ_start
+      l1cache_status_hit_time[i] = 0;
+      l1cache_status_hrs_time[i] = 0;
+      l1cache_status_mis_time[i] = 0;
+      l1cache_status_rsf_time[i] = 0;
+      l1cache_status_stm_time[i] = 0;
+      //IJ_end
+
       //for (unsigned j=0; j < 4; j++) {
       //	l1cache_status[i][j] = 0;
       //	l2cache_status[i][j] = 0;
       //}
     }
+  }
+};
+
+struct cta_stat {
+ // cta_stat() { init(); }
+//	std::vector<unsigned> warp_array;
+	std::vector<unsigned long long> wb_cycle;
+	std::vector<unsigned long long> is_cycle;
+
+  void init(){
+	  wb_cycle.clear();
+	  is_cycle.clear();
+    /*for (unsigned i = 0; i < 32; i++) {
+      warp_array[i] =0;
+      wb_cycle[i] = 0;
+      is_cycle[i] = 0;
+    }*/
   }
 };
 
@@ -1875,6 +1919,8 @@ struct shader_core_stats_pod {
 
 #if (RPT_LD_TIME) // JH : for ld_time
 	std::map<address_type/*PC*/, ldtime_stat_acc> m_ldtime_stat_pc;
+	// JH : cta stat
+	std::map<unsigned/*cta_id*/, cta_stat> m_cta_stat;
 #endif	// RPT_LD_TIME
 
   
@@ -2053,6 +2099,8 @@ class shader_core_stats : public shader_core_stats_pod {
 
   #if (RPT_LD_TIME) // JH
     m_ldtime_stat_pc.clear();
+    // JH : cta stat
+    m_cta_stat.clear();
   #endif
 
   #if RPT_STDERR // JH : file pointers are set to stderr when GPGPU-sim runs on a cluster
@@ -2398,6 +2446,7 @@ class shader_core_ctx : public core_t {
 
 #if (RPT_LD_TIME) // JH : manage load time information in SM (changed)
   std::vector< std::map<address_type/*pc*/, ldtime_stat/*stat*/> > m_ldtime;
+  // std::vector< std::map<address_type/*pc*/, rsf_time/*reservation_time*/> > m_rsftime;
   //std::map<unsigned/*warp_id*/, std::map<address_type/*pc*/, ldtime_stat/*stat*/> > m_ldtime;
   // JH : update ld_time in writeback() of ldst_unit
   void update_ld_time_wb( const warp_inst_t &inst, mem_fetch *mf );

@@ -52,6 +52,7 @@
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
+
 #if (RPT_LD_TIME)
         std::map< address_type/*pc*/,std::map< new_addr_type/*addr*/, std::vector<unsigned/*sid*/>  > > Addr_list;
 #endif
@@ -941,21 +942,25 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
   unsigned tot_acc = 0;
   unsigned mul_addr = 0;
   unsigned mul_acc = 0;
+  unsigned sm_count = 0;
   unsigned m_count = 0;
   unsigned temp = 0;
-  fprintf(fp, "JH : load inst addr ------------------------\n");
+  fprintf(fp, "JH : load inst address stat ------------------------\n");
   std::map< address_type, std::map<new_addr_type , std::vector<unsigned> > >::const_iterator it;
+  // loop by PC(load instructions)
   for ( it = Addr_list.begin(); it != Addr_list.end(); it++ ) {
     fprintf(fp, "PC =%04X\n", it->first);
     tot_acc = 0;
     mul_acc = 0;
     mul_addr = 0;
     tot_addr = it->second.size();
+    // loop by addresses within PC
     for ( auto it2 = it->second.begin(); it2 != it->second.end(); it2++ ) {
-      m_count = 0;
       temp = 0;
+      m_count = 0;
+      // loop by SMs for collect SM distribution
       for ( auto it3 = it2->second.begin(); it3 != it2->second.end(); it3++ ) {
-        fprintf(fp, "%d, ", *it3);
+        //fprintf(fp, "%d, ", *it3);
 	temp += *it3;
 	if (*it3 != 0) {
 	  m_count++;
@@ -964,15 +969,20 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
       tot_acc+=temp;
       if (m_count >= 2) {
 	      mul_addr++;
-	      mul_acc = temp;
+	      mul_acc += temp;
+	      sm_count += m_count;
       }
-      fprintf(fp, "\nAddress = %llX\t", it2->first );
-      fprintf(fp, "total access counts of address: %d\n", temp);
+      
+      //fprintf(fp, "\n");
+      //fprintf(fp, "Address = %llX\t", it2->first );
+      //fprintf(fp, "total access counts of an address: %d\n", temp);
     }
-    fprintf(fp, "address counts by accessing multiple SMs: %d\n", mul_addr);
-    fprintf(fp, "total access counts of address : %d\n", tot_addr);
-    fprintf(fp, "access counts for address by multiple SMs : %d\n", mul_acc);
-    fprintf(fp, "total address access of PC : %d\n", tot_acc);
+    fprintf(fp, "SM counts of total multiple accessed address / total multiple accessed address counts = %3.3f\n",(float)sm_count/mul_addr);
+    fprintf(fp, "count for multiple address(accessed by multiple SMs): %d\n", mul_addr);
+    fprintf(fp, "total count for address : %d\n", tot_addr);
+    fprintf(fp, "count for multiple access by multiple SMs : %d\n", mul_acc);
+    fprintf(fp, "total count for access of PC : %d\n", tot_acc);
+    fprintf(fp, "----------------------------------------------\n");
   } 
 }
 #endif
@@ -981,10 +991,53 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
 void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 {
   unsigned num_sm = m_config->num_shader();
+  
+  // JH : cta stat
+  std::map<unsigned/*cta_id*/, cta_stat>::const_iterator id;
+  unsigned long long max_cta = 0;
+  unsigned long long min_cta = 0;
+  fprintf(fp, "JH ---- CTA stat --------------------------------------\n ");
+  for ( id=m_cta_stat.begin(); id!=m_cta_stat.end(); ++id ) {
+    unsigned cta_id = id->first;
+    cta_stat cstat = id->second;
+    
+    //analyze cta time
+    //min_cta = cstat.wb_cycle[0];
+  /*  unsigned long long max_is = cstat.is_cycle[0];
+    unsigned long long min_is = cstat.is_cycle[0];
+    unsigned long long max_wb = cstat.wb_cycle[0];
+    unsigned long long min_wb = cstat.wb_cycle[0];
+    for (unsigned long long k = 1; k < cstat.is_cycle.size(); ++k) {
+      if (cstat.is_cycle[k] < min_is ) min_is = cstat.is_cycle[k];
+      if (cstat.is_cycle[k] > max_is ) max_is = cstat.is_cycle[k];
+      if (cstat.wb_cycle[k] < min_wb ) min_wb = cstat.wb_cycle[k];
+      if (cstat.wb_cycle[k] > max_wb ) max_wb = cstat.wb_cycle[k];
+    }
+    unsigned long long gap_is = max_is - min_is;
+    unsigned long long gap_wb = max_wb - min_wb; 
+   */
+    unsigned long long max = cstat.wb_cycle[0] - cstat.is_cycle[0];
+    unsigned long long min = cstat.wb_cycle[0] - cstat.is_cycle[0];
+    for (unsigned long long k = 1; k < cstat.is_cycle.size(); ++k) {
+      if (min <= 0) min = cstat.wb_cycle[k] - cstat.is_cycle[k];
+      if (cstat.wb_cycle[k] - cstat.is_cycle[k] < min ) min = cstat.wb_cycle[k] - cstat.is_cycle[k];
+      if (cstat.wb_cycle[k] - cstat.is_cycle[k] > max ) max = cstat.wb_cycle[k] - cstat.is_cycle[k];
+    }
+
+    fprintf(fp, "JH, CTA ID : %d\t", cta_id);
+    fprintf(fp, "max CTA cycle : %lld, min CTA cycle : %lld\n", max, min);
+    if (max > max_cta) max_cta = max;
+    if (min_cta <= 0) min_cta = min;
+    if (min < min_cta) min_cta = min;
+  }
+  fprintf(fp, "JH_Summary, Total Max CTA cycle : %lld, Total Min CTA cycle : %lld\n", max_cta, min_cta );
+  fprintf(fp, "---------------------------------------\n");
+
   fprintf(stdout, "GK_Summary, ----- LD time --------------------------------\n");
   //JH 
   fprintf(fp, "req_num, ex+wb, ex, cache, sm->icnt, icnt->sm, resp, req_num, L1 hit, hit rsv, miss, rsv fail, str miss, L2 hit, hit rsv, miss, rsv fail, str miss\n"); 
   std::map<address_type/*pc*/, ldtime_stat_acc>::const_iterator it;
+
   for ( it=m_ldtime_stat_pc.begin(); it!=m_ldtime_stat_pc.end(); ++it ) {
     address_type pc = it->first;
     ldtime_stat_acc stat = it->second;
@@ -1011,7 +1064,13 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
     double sm_icnt_cycle_acc = 0.0;
     double icnt_sm_cycle_acc = 0.0;
     double resp_cycle_acc = 0.0;
-
+    // IJ_start
+    unsigned long l1cache_status_hit_time_acc = 0;
+    unsigned long l1cache_status_hrs_time_acc = 0;
+    unsigned long l1cache_status_mis_time_acc = 0;
+    unsigned long l1cache_status_rsf_time_acc = 0;
+    unsigned long l1cache_status_stm_time_acc = 0;
+    // IJ_end
     unsigned long l1cache_status_hit_acc = 0;
     unsigned long l1cache_status_hrs_acc = 0;
     unsigned long l1cache_status_mis_acc = 0;
@@ -1043,6 +1102,14 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
       icnt_sm_cycle_acc += stat.icnt_sm_cycle[i];
       resp_cycle_acc += stat.resp_cycle[i];
 
+      // IJ_start
+//      l1cache_status_hit_time_acc += stat.l1cache_status_hit_time[i];
+//      l1cache_status_hrs_time_acc += stat.l1cache_status_hrs_time[i];
+//      l1cache_status_mis_time_acc += stat.l1cache_status_mis_time[i];
+//      l1cache_status_rsf_time_acc += stat.l1cache_status_rsf_time[i];
+//      l1cache_status_stm_time_acc += stat.l1cache_status_stm_time[i];
+      // IJ_end
+
       l1cache_status_hit_acc += stat.l1cache_status_hit[i];
       l1cache_status_hrs_acc += stat.l1cache_status_hrs[i];
       l1cache_status_mis_acc += stat.l1cache_status_mis[i];
@@ -1056,19 +1123,27 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
       l2cache_status_mis_acc += stat.l2cache_status_mis[i];
       l2cache_status_rsf_acc += stat.l2cache_status_rsf[i];
 
-      stat.ex_cycle[i] /= stat.num[i];
-      stat.wb_cycle[i] /= stat.num[i];
-      stat.cache_cycle[i] /= stat.num[i];
-      stat.sm_icnt_cycle[i] /= stat.num[i];
-      stat.icnt_sm_cycle[i] /= stat.num[i];
-      stat.resp_cycle[i] /= stat.num[i];
+      // stat.ex_cycle[i] /= stat.num[i];
+      // stat.wb_cycle[i] /= stat.num[i];
+      // stat.cache_cycle[i] /= stat.num[i];
+      // stat.sm_icnt_cycle[i] /= stat.num[i];
+      // stat.icnt_sm_cycle[i] /= stat.num[i];
+      // stat.resp_cycle[i] /= stat.num[i];
       if (stat.num[i]==0) {
         stat.ex_cycle[i] = 0.0;
-  	stat.wb_cycle[i] = 0.0;
-	stat.cache_cycle[i] = 0.0;
-	stat.sm_icnt_cycle[i] = 0.0;
-	stat.icnt_sm_cycle[i] = 0.0;
-	stat.resp_cycle[i] = 0.0;
+        stat.wb_cycle[i] = 0.0;
+        stat.cache_cycle[i] = 0.0;
+        stat.sm_icnt_cycle[i] = 0.0;
+        stat.icnt_sm_cycle[i] = 0.0;
+        stat.resp_cycle[i] = 0.0;
+      }
+      else{
+        stat.ex_cycle[i] /= stat.num[i];
+        stat.wb_cycle[i] /= stat.num[i];
+        stat.cache_cycle[i] /= stat.num[i];
+        stat.sm_icnt_cycle[i] /= stat.num[i];
+        stat.icnt_sm_cycle[i] /= stat.num[i];
+        stat.resp_cycle[i] /= stat.num[i];
       }
       // time information (integrated)
       //fprintf(fp, "GK_LdTime, %02d, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf",
@@ -1080,18 +1155,31 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
       //		stat.resp_cycle[i] - stat.icnt_sm_cycle[i],
       //		stat.wb_cycle[i] - stat.resp_cycle[i]
       //);
+
+      // JH
       // time information (separated)
-      fprintf(fp, "GK_LdTime, %02d, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf",
-		      i+1,
-		      stat.ex_cycle[i] + stat.wb_cycle[i],
-			stat.ex_cycle[i],
-		      stat.cache_cycle[i],
-		      stat.sm_icnt_cycle[i],
-		      stat.icnt_sm_cycle[i],
-		      stat.resp_cycle[i]	);
+       fprintf(fp, "GK_LdTime, %02d, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf",
+		       i+1,
+		       stat.ex_cycle[i] + stat.wb_cycle[i],
+		  	 stat.ex_cycle[i],
+		       stat.cache_cycle[i],
+		       stat.sm_icnt_cycle[i],
+		       stat.icnt_sm_cycle[i],
+		       stat.resp_cycle[i]	);
+
+      // IJ_start
+      //fprintf(fp, "GK_LdTime, %02d, %d, %d, %d, %d, %d",
+//		      i+1,
+//		      stat.l1cache_status_hit_time[i],
+//          stat.l1cache_status_hrs_time[i],
+//          stat.l1cache_status_mis_time[i],
+//          stat.l1cache_status_rsf_time[i],
+//          stat.l1cache_status_stm_time[i]	);
+      // IJ_end
+
              
       // cache statistics
-      fprintf(fp, ",\t %02d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n",
+      fprintf(fp, ",\t %02lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n",
 		      i+1,  // JH : sector miss
 		      stat.l1cache_status_hit[i], stat.l1cache_status_hrs[i], stat.l1cache_status_mis[i], stat.l1cache_status_rsf[i], stat.l1cache_status_stm[i],
 		      stat.l2cache_status_hit[i], stat.l2cache_status_hrs[i], stat.l2cache_status_mis[i], stat.l2cache_status_rsf[i], stat.l2cache_status_stm[i],
@@ -1117,13 +1205,21 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
     }
     // overall
     fprintf(fp, "--------- statistics per access ------------\n");
-    fprintf(fp, "GK_LdTime, total, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf",
-		    (num_acc==0) ? 0.0: (ex_cycle_acc + wb_cycle_acc) / num_acc,
-		    (num_acc==0) ? 0.0: ex_cycle_acc / num_acc,
-		    (num_acc==0) ? 0.0: cache_cycle_acc / num_acc,
-		    (num_acc==0) ? 0.0: sm_icnt_cycle_acc / num_acc,
-		    (num_acc==0) ? 0.0: icnt_sm_cycle_acc / num_acc,
-		    (num_acc==0) ? 0.0: resp_cycle_acc / num_acc   );
+    // fprintf(fp, "GK_LdTime, total, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf, %3.3lf",
+		//     (num_acc==0) ? 0.0: (ex_cycle_acc + wb_cycle_acc) / num_acc,
+		//     (num_acc==0) ? 0.0: ex_cycle_acc / num_acc,
+		//     (num_acc==0) ? 0.0: cache_cycle_acc / num_acc,
+		//     (num_acc==0) ? 0.0: sm_icnt_cycle_acc / num_acc,
+		//     (num_acc==0) ? 0.0: icnt_sm_cycle_acc / num_acc,
+		//     (num_acc==0) ? 0.0: resp_cycle_acc / num_acc   );
+    // IJ_start
+    fprintf(fp, "GK_LdTime, total,%d, %d, %d, %d, %d",
+    l1cache_status_hit_time_acc,
+    l1cache_status_hrs_time_acc,
+    l1cache_status_mis_time_acc,
+    l1cache_status_rsf_time_acc,
+    l1cache_status_stm_time_acc);
+    // IJ_end
     fprintf(fp, ",\t total, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n", // JH : sector miss
 		    l1cache_status_hit_acc, l1cache_status_hrs_acc, l1cache_status_mis_acc, l1cache_status_rsf_acc, l1cache_status_stm_acc,
 		    l2cache_status_hit_acc, l2cache_status_hrs_acc, l2cache_status_mis_acc, l2cache_status_rsf_acc, l2cache_status_stm_acc,
@@ -1139,7 +1235,7 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
 	      (num_acc==0) ? 0.0: sm_icnt_cycle_acc / num_acc,
 	      (num_acc==0) ? 0.0: icnt_sm_cycle_acc / num_acc,
 	      (num_acc==0) ? 0.0: resp_cycle_acc / num_acc      );
-      fprintf(stdout, ",\t %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n", // JH : sector miss
+      fprintf(stdout, ",\t %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", // JH : sector miss
 		      l1cache_status_hit_acc, l1cache_status_hrs_acc, l1cache_status_mis_acc, l1cache_status_rsf_acc, l1cache_status_stm_acc,
 		      l2cache_status_hit_acc, l2cache_status_hrs_acc, l2cache_status_mis_acc, l2cache_status_rsf_acc, l2cache_status_stm_acc,
 		      num_acc	);
@@ -1237,12 +1333,19 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
   address_type pc = inst.pc;
   unsigned n_mf = inst.get_num_mem_requests() - 1;	// it should be more than or equal to 1
   
+  // JH : ctx id call
+  dim3 cta_3d = get_kernel()->get_next_cta_id();
+  dim3 cta_dim = get_kernel()->get_grid_dim();
+  dim3 warp_dim = get_kernel()->get_cta_dim();
+
+  unsigned cta_id = cta_dim.x * cta_dim.y * cta_3d.z + cta_dim.x * cta_3d.y + cta_3d.x;
+  unsigned cta_wid = (unsigned int)(warp_dim.x * warp_dim.y * warp_dim.z * cta_id/32) + wid;   
+  // fprintf(stdout, "ctx id of this warp : %d\n", cta_id );  
 
   if ( m_ldtime[wid].find(pc)==m_ldtime[wid].end() ) {
       //fprintf(stdout, "Entry for (%2d:%04X) is not found\n", wid, pc);  
       return;
   }
-
   std::map<address_type, ldtime_stat>::iterator it;
   it = m_ldtime[wid].find(pc);
   // JH : gpu_sim_cycle, gpu_tot_sim_cycle
@@ -1250,6 +1353,21 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
   unsigned long long is_cycle = inst.get_issue_cycle();
   unsigned long long ex_cycle = it->second.m_ex_cycle;
   //unsigned long long ex_cycle = inst.get_execute_cycle();
+
+     //JH : cta stat
+  if ( m_stats->m_cta_stat.find(cta_id)==m_stats->m_cta_stat.end() ) {        // not in entry
+    m_stats->m_cta_stat.insert( std::pair<unsigned, cta_stat>(cta_id, cta_stat()) );
+  }
+  std::map<unsigned, cta_stat>::iterator ip;
+  ip = m_stats->m_cta_stat.find(cta_id);
+  if (m_stats->m_cta_stat[cta_id].is_cycle.size() <= cta_wid ) {
+  	m_stats->m_cta_stat[cta_id].wb_cycle.resize(cta_wid+1,0);
+	m_stats->m_cta_stat[cta_id].is_cycle.resize(cta_wid+1,0);
+
+  }
+//  ip->second.warp_array[cta_wid]++;
+  ip->second.wb_cycle[cta_wid] = wb_cycle;
+  ip->second.is_cycle[cta_wid] = is_cycle;
 	
   if ( (ex_cycle > 0) ) {	// at least, memory request needs to touch cache
     unsigned num_sm = m_config->num_shader();
@@ -1291,19 +1409,13 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
       cycle_stat icnt_sm_stat;
       cycle_stat resp_stat;
 
-      cache_stat = analyze_timestamps(it->second.m_cache_cycle, it->second.m_num_cache, stderr ); 
+      cache_stat = analyze_timestamps(  it->second.m_cache_cycle,   it->second.m_num_cache, stderr ); 
       sm_icnt_stat = analyze_timestamps(it->second.m_sm_icnt_cycle, it->second.m_num_sm_icnt, stderr ); 
       icnt_sm_stat = analyze_timestamps(it->second.m_icnt_sm_cycle, it->second.m_num_icnt_sm, stderr ); 
-      resp_stat = analyze_timestamps(it->second.m_resp_cycle, it->second.m_num_resp, stderr ); 
+      resp_stat = analyze_timestamps(   it->second.m_resp_cycle,    it->second.m_num_resp, stderr ); 
 			
       // per SM --> deleted (not working?)
-      //id->second.num[n_mf][m_sid]++;
-      //id->second.ex_cycle[n_mf][m_sid] += (double) (ex_cycle - is_cycle);
-      //id->second.wb_cycle[n_mf][m_sid] += (double) (wb_cycle - ex_cycle);
-      //id->second.cache_cycle[n_mf][m_sid] += (double) cache_stat.gap;
-      //id->second.sm_icnt_cycle[n_mf][m_sid] += (double) sm_icnt_stat.gap;
-      //id->second.icnt_sm_cycle[n_mf][m_sid] += (double) icnt_sm_stat.gap;
-      //id->second.resp_cycle[n_mf][m_sid] += (double) resp_stat.gap;
+
       // overall
 
       id->second.num[n_mf]++;
@@ -1318,15 +1430,19 @@ void shader_core_ctx::acc_ld_time( const warp_inst_t &inst, bool f_wb )
       id->second.l1cache_status_hrs[n_mf] += it->second.m_l1cache_status[1];
       id->second.l1cache_status_mis[n_mf] += it->second.m_l1cache_status[2];
       id->second.l1cache_status_rsf[n_mf] += it->second.m_l1cache_status[3];
-
-      // JH : sector miss
       id->second.l1cache_status_stm[n_mf] += it->second.m_l1cache_status[4];
       id->second.l2cache_status_stm[n_mf] += it->second.m_l2cache_status[4];
-
       id->second.l2cache_status_hit[n_mf] += it->second.m_l2cache_status[0];
       id->second.l2cache_status_hrs[n_mf] += it->second.m_l2cache_status[1];
       id->second.l2cache_status_mis[n_mf] += it->second.m_l2cache_status[2];
       id->second.l2cache_status_rsf[n_mf] += it->second.m_l2cache_status[3];
+
+      //if     (it->second.status == HIT)               id->second.l1cache_status_hit_time[n_mf] += wb_cycle - is_cycle;
+      //else if(it->second.status == HIT_RESERVED)      id->second.l1cache_status_hrs_time[n_mf] += wb_cycle - is_cycle;
+      //else if(it->second.status == MISS)              id->second.l1cache_status_mis_time[n_mf] += wb_cycle - is_cycle;
+      //else if(it->second.status == RESERVATION_FAIL)  id->second.l1cache_status_rsf_time[n_mf] += it->second.pc_ldtime_stat.m_rsf_cycle;
+      //else if(it->second.status == SECTOR_MISS)       id->second.l1cache_status_stm_time[n_mf] += wb_cycle - is_cycle;
+
 
       //for (unsigned i=0; i < 4; i++) {
       //	id->second.l1cache_status[n_mf][i] += it->second.m_l1cache_status[i];
@@ -1359,9 +1475,9 @@ void shader_core_ctx::decode() {
     // decode 1 or 2 instructions and place them into ibuffer
     address_type pc = m_inst_fetch_buffer.m_pc;
     const warp_inst_t *pI1 = get_next_inst(m_inst_fetch_buffer.m_warp_id, pc);
-    m_warp[m_inst_fetch_buffer.m_warp_id]->ibuffer_fill(0, pI1);
-    m_warp[m_inst_fetch_buffer.m_warp_id]->inc_inst_in_pipeline();
-    if (pI1) {
+    m_warp[m_inst_fetch_buffer.m_warp_id]->ibuffer_fill(0, pI1); // fill I-Buffer slot 0 with pI1 instruction and set valid bit
+    m_warp[m_inst_fetch_buffer.m_warp_id]->inc_inst_in_pipeline();// increment number of instructions in pipeline. 
+    if (pI1) { // if you success fetch next instruction, check instruction whether integer type or floating point type
       m_stats->m_num_decoded_insn[m_sid]++;
       if (pI1->oprnd_type == INT_OP) {
         m_stats->m_num_INTdecoded_insn[m_sid]++;
@@ -1369,7 +1485,7 @@ void shader_core_ctx::decode() {
         m_stats->m_num_FPdecoded_insn[m_sid]++;
       }
       const warp_inst_t *pI2 =
-          get_next_inst(m_inst_fetch_buffer.m_warp_id, pc + pI1->isize);
+          get_next_inst(m_inst_fetch_buffer.m_warp_id, pc + pI1->isize); // It can decode upto two instructions per cycle. 
       if (pI2) {
         m_warp[m_inst_fetch_buffer.m_warp_id]->ibuffer_fill(1, pI2);
         m_warp[m_inst_fetch_buffer.m_warp_id]->inc_inst_in_pipeline();
@@ -1381,7 +1497,7 @@ void shader_core_ctx::decode() {
         }
       }
     }
-    m_inst_fetch_buffer.m_valid = false;
+    m_inst_fetch_buffer.m_valid = false;  // after decode, unset valid bit in inst_fetch_buffer(not I-Buffer yet)
   }
 }
 
@@ -1669,11 +1785,11 @@ void shader_core_ctx::issue_warp(register_set &pipe_reg_set,
 void shader_core_ctx::issue() {
   // Ensure fair round robin issu between schedulers
   unsigned j;
-  for (unsigned i = 0; i < schedulers.size(); i++) {
+  for (unsigned i = 0; i < schedulers.size(); i++) { // issue instructions upto number of schedulers in a cycle
     j = (Issue_Prio + i) % schedulers.size();
     schedulers[j]->cycle();
   }
-  Issue_Prio = (Issue_Prio + 1) % schedulers.size();
+  Issue_Prio = (Issue_Prio + 1) % schedulers.size(); // update issue priority
 
   // really is issue;
   // for (unsigned i = 0; i < schedulers.size(); i++) {
@@ -2472,6 +2588,7 @@ mem_stage_stall_type ldst_unit::process_cache_access(
   #if (RPT_LD_TIME) // JH : log cache status
   if (status < NUM_CACHE_REQUEST_STATUS) {
     if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )	{// new entry
+      // ldtime_stat ldtime_tmp = ldtime_stat();
       m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat>(pc, ldtime_stat()) );   
     }
     m_core->m_ldtime[wid][pc].m_l1cache_status[status]++;
@@ -2480,7 +2597,7 @@ mem_stage_stall_type ldst_unit::process_cache_access(
   // JH : log timestamps for cache accesses
   if ( (status==HIT) || (status==MISS) || (status==HIT_RESERVED) || (status==SECTOR_MISS) ) {
     if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )	// new entry
-       	    m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat>(pc, ldtime_stat()) );
+       	    m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat>(pc,ldtime_stat()) );
     if ( m_core->m_ldtime[wid][pc].m_num_cache < 32) {  
 	    m_core->m_ldtime[wid][pc].m_cache_cycle[ m_core->m_ldtime[wid][pc].m_num_cache ] 
 		// JH : gpu_sim_cycle, gpu_tot_sim_cycle
@@ -2622,6 +2739,7 @@ void ldst_unit::L1_latency_queue_cycle() {
       mem_fetch *mf_next = l1_latency_queue[j][0];
   
       // JH
+      // getting warp id and PC within fetched memory request
       unsigned wid = mf_next->get_wid();
       address_type pc = mf_next->get_pc();
       //new_addr_type addr = mf_next->get_addr(); // JH : addr stat
@@ -2630,57 +2748,61 @@ void ldst_unit::L1_latency_queue_cycle() {
       unsigned sid = mf_next->get_sid();
       new_addr_type addr = mf_next->get_addr();
 #if (RPT_LD_TIME)
+      // track address access across SMs (to find GPGPU's inefficiency of data locality)
       const warp_inst_t load_check = mf_next->get_inst();
       if (load_check.is_load()) {
         if (Addr_list.find(pc) != Addr_list.end()) { // pc exist
-		if (Addr_list[pc].find(addr) == Addr_list[pc].end()) { // addr don't exist
-			std::vector<unsigned> new_sid;
-			new_sid.assign(30,0);
-			new_sid[sid]++;
-			Addr_list[pc].insert(std::pair<new_addr_type, std::vector<unsigned> >(addr, new_sid)); // new addr entry
-			
-		} else {
-			Addr_list[pc][addr][sid]++;
-		}
-
-	} else { // new pc entry
-		std::vector<unsigned> new_sid;
-		new_sid.assign(30,0);
-		new_sid[sid]++;
-		std::map<new_addr_type, std::vector< unsigned> > new_addr;
-		new_addr.insert(std::pair<new_addr_type, std::vector<unsigned> >(addr, new_sid));
-		Addr_list.insert(std::pair<address_type, std::map<new_addr_type, std::vector<unsigned> > >(pc, new_addr));	
-	}
-      
+          if (Addr_list[pc].find(addr) == Addr_list[pc].end()) { // addr don't exist
+            std::vector<unsigned> new_sid;
+            new_sid.assign(30,0);
+            new_sid[sid]++;
+            Addr_list[pc].insert(std::pair<new_addr_type, std::vector<unsigned> >(addr, new_sid)); // new addr entry
+            
+          } else {
+            Addr_list[pc][addr][sid]++;
+          }
+        } else { // new pc entry
+          std::vector<unsigned> new_sid;
+          new_sid.assign(30,0);
+          new_sid[sid]++;
+          std::map<new_addr_type, std::vector< unsigned> > new_addr;
+          new_addr.insert(std::pair<new_addr_type, std::vector<unsigned> >(addr, new_sid));
+          Addr_list.insert(std::pair<address_type, std::map<new_addr_type, std::vector<unsigned> > >(pc, new_addr));	
+        }      
       }
-
 #endif
+
       std::list<cache_event> events;
       enum cache_request_status status =
           m_L1D->access(mf_next->get_addr(), mf_next,
                         m_core->get_gpu()->gpu_sim_cycle +
                             m_core->get_gpu()->gpu_tot_sim_cycle,
                         events);
-     #if (RPT_LD_TIME)	// JH
+     #if (RPT_LD_TIME)	// JH + IJ
       if (status < NUM_CACHE_REQUEST_STATUS) {
         if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )  {// new entry
-        	m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat>(pc, ldtime_stat()) );
-	  }	  
-    	  m_core->m_ldtime[wid][pc].m_l1cache_status[status]++;
-	}
+        	m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat >(pc,ldtime_stat()) );
+          //if (status == RESERVATION_FAIL)
+            //m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_rsf_cycle = load_check.get_issue_cycle();
+        }	          
+    	  m_core->m_ldtime[wid][pc].m_l1cache_status[status]++; // including reservation fail
+	    }
 
       // JH : log timestamps for cache accesses + added sector miss	
       if ( (status==HIT) || (status==MISS) || (status==HIT_RESERVED) || (status==SECTOR_MISS) ) {
         if ( m_core->m_ldtime[wid].find(pc)==m_core->m_ldtime[wid].end() )  // new entry
-		m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat>(pc, ldtime_stat()) );	
-	if ( m_core->m_ldtime[wid][pc].m_num_cache < 32) {
-		m_core->m_ldtime[wid][pc].m_cache_cycle[ m_core->m_ldtime[wid][pc].m_num_cache ]
-                // JH : gpu_sim_cycle, gpu_tot_sim_cycle
-		//	= m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
-			= mf_sim_cycle + mf_tot_sim_cycle;
-		m_core->m_ldtime[wid][pc].m_num_cache++;	
-	}	
-      }	
+		      m_core->m_ldtime[wid].insert( std::pair<address_type, ldtime_stat>(pc, ldtime_stat()) );	
+	      if ( m_core->m_ldtime[wid][pc].m_num_cache < 32) {
+          m_core->m_ldtime[wid][pc].m_cache_cycle[ m_core->m_ldtime[wid][pc].m_num_cache ]
+          // JH : gpu_sim_cycle, gpu_tot_sim_cycle
+          //	= m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle;
+            = mf_sim_cycle + mf_tot_sim_cycle;
+          m_core->m_ldtime[wid][pc].m_num_cache++;	
+        }	
+        if(m_core->m_ldtime[wid].find(pc) != m_core->m_ldtime[wid].end()){
+          //m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_rsf_cycle = mf_sim_cycle + mf_tot_sim_cycle - m_core->m_ldtime[wid][pc].pc_ldtime_stat.m_rsf_cycle; // update to reservation fail latency
+        }
+      }
       if ( m_core->m_ldtime[wid].find(pc) != m_core->m_ldtime[wid].end() ){	
 	       m_core->m_ldtime[wid][pc].m_ex_cycle 
 		       = m_core->get_gpu()->gpu_sim_cycle + m_core->get_gpu()->gpu_tot_sim_cycle; 
@@ -2705,7 +2827,7 @@ void ldst_unit::L1_latency_queue_cycle() {
                   --m_pending_writes[mf_next->get_inst().warp_id()]
                                     [mf_next->get_inst().out[r]];
               
-	      if (!still_pending) {
+	          if (!still_pending) {
                 m_pending_writes[mf_next->get_inst().warp_id()].erase(
                     mf_next->get_inst().out[r]);
                 m_scoreboard->releaseRegister(mf_next->get_inst().warp_id(),
@@ -2713,7 +2835,7 @@ void ldst_unit::L1_latency_queue_cycle() {
                 m_core->warp_inst_complete(mf_next->get_inst());
               }
             }
-	  	// JH : next inst complete
+	  	  // JH : next inst complete
         }
 
         // For write hit in WB policy
@@ -2727,10 +2849,9 @@ void ldst_unit::L1_latency_queue_cycle() {
 
           for (unsigned i = 0; i < dec_ack; ++i) m_core->store_ack(mf_next);
         }
-
         if (!write_sent) {
-		delete mf_next;
-	}
+		      delete mf_next;
+	      }
       } else if (status == RESERVATION_FAIL) {
         assert(!read_sent);
         assert(!write_sent);
