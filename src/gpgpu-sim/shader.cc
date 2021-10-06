@@ -953,6 +953,7 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
     tot_acc = 0;
     mul_acc = 0;
     mul_addr = 0;
+    sm_count = 0;
     tot_addr = it->second.size();
     // loop by addresses within PC
     for ( auto it2 = it->second.begin(); it2 != it->second.end(); it2++ ) {
@@ -961,10 +962,10 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
       // loop by SMs for collect SM distribution
       for ( auto it3 = it2->second.begin(); it3 != it2->second.end(); it3++ ) {
         //fprintf(fp, "%d, ", *it3);
-	temp += *it3;
-	if (*it3 != 0) {
-	  m_count++;
-	}
+        temp += *it3;
+        if (*it3 != 0) {
+          m_count++;
+        }
       }
       tot_acc+=temp;
       if (m_count >= 2) {
