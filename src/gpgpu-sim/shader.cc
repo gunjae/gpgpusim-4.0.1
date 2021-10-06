@@ -935,7 +935,7 @@ const active_mask_t &exec_shader_core_ctx::get_active_mask(
     unsigned warp_id, const warp_inst_t *pI) {
   return m_simt_stack[warp_id]->get_active_mask();
 }
-#if (RPT_LD_TIME)
+#if (RPT_LD_TIME) // JH : address stat print
 void shader_core_stats::print_addr_list( FILE *fp ) const 
 {
   unsigned tot_addr = 0;
@@ -985,7 +985,7 @@ void shader_core_stats::print_addr_list( FILE *fp ) const
     fprintf(fp, "----------------------------------------------\n");
   } 
 }
-#endif
+#endif // JH : address stat print
 
 #if (RPT_LD_TIME) // JH : print ld_time information aligned by PC
 void shader_core_stats::print_ld_time_bar( FILE *fp ) const
@@ -996,6 +996,8 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
   std::map<unsigned/*cta_id*/, cta_stat>::const_iterator id;
   unsigned long long max_cta = 0;
   unsigned long long min_cta = 0;
+  unsigned long long num_cta = 0;
+  float avg_cta = 0;
   fprintf(fp, "JH ---- CTA stat --------------------------------------\n ");
   for ( id=m_cta_stat.begin(); id!=m_cta_stat.end(); ++id ) {
     unsigned cta_id = id->first;
@@ -1018,19 +1020,34 @@ void shader_core_stats::print_ld_time_bar( FILE *fp ) const
    */
     unsigned long long max = cstat.wb_cycle[0] - cstat.is_cycle[0];
     unsigned long long min = cstat.wb_cycle[0] - cstat.is_cycle[0];
+    unsigned long long avg = 0;
+    unsigned long long num = 0;
+    unsigned long long temp = 0;
+    float avg_temp = 0;
     for (unsigned long long k = 1; k < cstat.is_cycle.size(); ++k) {
-      if (min <= 0) min = cstat.wb_cycle[k] - cstat.is_cycle[k];
-      if (cstat.wb_cycle[k] - cstat.is_cycle[k] < min ) min = cstat.wb_cycle[k] - cstat.is_cycle[k];
-      if (cstat.wb_cycle[k] - cstat.is_cycle[k] > max ) max = cstat.wb_cycle[k] - cstat.is_cycle[k];
+      temp = cstat.wb_cycle[k] - cstat.is_cycle[k];
+      if (min <= 0) min = temp;
+      if (temp < min ) min = temp;
+      if (temp > max ) max = temp;
+      if (max > 0) {
+      	avg += max;
+	num++;
+      }
+    }
+    avg_temp = (float) avg/num;
+
+    if (avg_temp > 0) {
+      avg_cta += avg_temp;
+      num_cta++; 
     }
 
     fprintf(fp, "JH, CTA ID : %d\t", cta_id);
-    fprintf(fp, "max CTA cycle : %lld, min CTA cycle : %lld\n", max, min);
+    fprintf(fp, "max warp cycle : %lld, min warp cycle : %lld\n", max, min );
     if (max > max_cta) max_cta = max;
     if (min_cta <= 0) min_cta = min;
     if (min < min_cta) min_cta = min;
   }
-  fprintf(fp, "JH_Summary, Total Max CTA cycle : %lld, Total Min CTA cycle : %lld\n", max_cta, min_cta );
+  fprintf(fp, "JH_Summary, Total Max CTA cycle : %lld, Total Min CTA cycle : %lld, Avg CTA cycle : %f\n", max_cta, min_cta, (float) avg_cta/num_cta );
   fprintf(fp, "---------------------------------------\n");
 
   fprintf(stdout, "GK_Summary, ----- LD time --------------------------------\n");
