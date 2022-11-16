@@ -1,0 +1,11 @@
+# setup for CUDA and GPGPU-Sim 4
+function setup_cuda_gpusim4() {
+	export CUDA_INSTALL_PATH=/usr/local/cuda
+#	export CUDA_INSTALL_PATH=/usr/local/cuda-10.1
+	PATH=$PATH:$CUDA_INSTALL_PATH/bin
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUDA_INSTALL_PATH/lib64:$CUDA_INSTALL_PATH/lib
+	export PTXAS_CUDA_INSTALL_PATH=$CUDA_INSTALL_PATH
+#	export NVIDIA_COMPUTE_SDK_LOCATION=~/workspace/cuda_sdk4
+}
+
+setup_cuda_gpusim4
